@@ -26,18 +26,13 @@ import (
 
 type decoder struct {	// flate.inflater, zlib.reader, gzip.inflater
 	compressionLevel
-	decoder io.ReadCloser
+	r	io.Reader
+	w	io.Writer
+	size	uint64
+	eos	bool
 	err     os.Error
 }
 
 func NewDecoder(w io.Reader) (io.ReadCloser, os.Error) {
 	return nil, nil
-}
-
-func (z *decoder) Read(p []byte) (n int, err os.Error) {
-	return
-}
-
-func (z *decoder) Close() os.Error {
-	return nil
 }
