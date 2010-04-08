@@ -12,32 +12,32 @@ const (
 )
 
 type syncPipeReader struct {
-        *io.PipeReader
-        closeChan chan bool
+	*io.PipeReader
+	closeChan chan bool
 }
 
 func (sr *syncPipeReader) CloseWithError(err os.Error) os.Error {
-        retErr := sr.PipeReader.CloseWithError(err)
-        sr.closeChan <- true // finish writer close
-        return retErr
+	retErr := sr.PipeReader.CloseWithError(err)
+	sr.closeChan <- true // finish writer close
+	return retErr
 }
 
 type syncPipeWriter struct {
-        *io.PipeWriter
-        closeChan chan bool
+	*io.PipeWriter
+	closeChan chan bool
 }
 
 func (sw *syncPipeWriter) Close() os.Error {
-        err := sw.PipeWriter.Close()
-        <-sw.closeChan // wait for reader close
-        return err
+	err := sw.PipeWriter.Close()
+	<-sw.closeChan // wait for reader close
+	return err
 }
 
 func syncPipe() (*syncPipeReader, *syncPipeWriter) {
-        r, w := io.Pipe()
-        sr := &syncPipeReader{r, make(chan bool, 1)}
-        sw := &syncPipeWriter{w, sr.closeChan}
-        return sr, sw
+	r, w := io.Pipe()
+	sr := &syncPipeReader{r, make(chan bool, 1)}
+	sw := &syncPipeWriter{w, sr.closeChan}
+	return sr, sw
 }
 
 type compressionLevel struct {
@@ -89,41 +89,44 @@ func (cl compressionLevel) checkValues() os.Error {
 }
 
 type encoder struct { // flate.deflater, zlib.writer, gzip.deflater
-	compressionLevel
-	w	io.Writer
-	r	io.Reader
-	size	uint64
-	eos	bool
-	err	os.Error
+	cl   compressionLevel
+	w    io.Writer
+	r    io.Reader
+	size uint64
+	eos  bool
+	err  os.Error
 }
 
-func (z *encoder) encode(r io.Reader, w io.Writer, cl compressionLevel) (err os.Error) {
+func (z *encoder) encoder(r io.Reader, w io.Writer, cl compressionLevel) (err os.Error) {
+
+	// set z fields
+	// start encoding
+
 	return nil
 }
 
 func newEncoderCompressionLevel(w io.Writer, cl compressionLevel) (io.WriteCloser, os.Error) {
-        if err := cl.checkValues(); err != nil {
-                return nil, err
-        }
-        cl.dictSize = 1 << cl.dictSize
+	if err := cl.checkValues(); err != nil {
+		return nil, err
+	}
+	cl.dictSize = 1 << cl.dictSize
 
 	var z encoder
 	pr, pw := syncPipe()
 	go func() {
-		err := z.encode(pr, w, cl)
+		err := z.encoder(pr, w, cl)
 		pr.CloseWithError(err)
 	}()
-
-        return pw, nil
+	return pw, nil
 }
 
 func NewEncoderLevel(w io.Writer, level int) (io.WriteCloser, os.Error) {
-        if level < 0 || level > 9 {
-                return nil, os.NewError("level out of range")
-        }
-        return newEncoderCompressionLevel(w, levels[level])
+	if level < 0 || level > 9 {
+		return nil, os.NewError("level out of range")
+	}
+	return newEncoderCompressionLevel(w, levels[level])
 }
 
 func NewEncoder(w io.Writer) (io.WriteCloser, os.Error) {
-        return NewEncoderLevel(w, DefaultCompression)
+	return NewEncoderLevel(w, DefaultCompression)
 }
