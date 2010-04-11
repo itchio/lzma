@@ -41,12 +41,12 @@ func syncPipe() (*syncPipeReader, *syncPipeWriter) {
 }
 
 type compressionLevel struct {
-	dictSize           uint32 // dictionary size, computed as (1 << D)
-	fastBytes          uint32 // number of fast bytes
-	literalContextBits uint32 // number of literal context bits
-	literalPosBits     uint32 // number of literal pos bits
-	posBits            uint32 // number of pos bits
-	matchFinder        string // Match Finder
+	dictSize           uint32 // d, dictionary size, computed as (1 << d)
+	fastBytes          uint32 // fb, number of fast bytes
+	literalContextBits uint32 // lc, number of literal context bits
+	literalPosBits     uint32 // lp, number of literal pos bits
+	posBits            uint32 // pb, number of pos bits
+	matchFinder        string // mf, Match Finder
 }
 
 var levels = []compressionLevel{
@@ -97,15 +97,20 @@ type encoder struct { // flate.deflater, zlib.writer, gzip.deflater
 	err  os.Error
 }
 
-func (z *encoder) encoder(r io.Reader, w io.Writer, cl compressionLevel) (err os.Error) {
-
+func (z *encoder) encoder(r io.Reader, w io.Writer, size uint64, eos bool, cl compressionLevel) (err os.Error) {
 	// set z fields
+	z.cl = cl
+	z.w = w
+	z.r = r
+	z.size = size
+	z.eos = eos
 	// start encoding
+	//blablabla
 
 	return nil
 }
 
-func newEncoderCompressionLevel(w io.Writer, cl compressionLevel) (io.WriteCloser, os.Error) {
+func newEncoderCompressionLevel(w io.Writer, size uint64, eos bool, cl compressionLevel) (io.WriteCloser, os.Error) {
 	if err := cl.checkValues(); err != nil {
 		return nil, err
 	}
@@ -114,19 +119,38 @@ func newEncoderCompressionLevel(w io.Writer, cl compressionLevel) (io.WriteClose
 	var z encoder
 	pr, pw := syncPipe()
 	go func() {
-		err := z.encoder(pr, w, cl)
+		err := z.encoder(pr, w, size, eos, cl)
 		pr.CloseWithError(err)
 	}()
 	return pw, nil
 }
 
-func NewEncoderLevel(w io.Writer, level int) (io.WriteCloser, os.Error) {
+func NewEncoderFileLevel(w io.Writer, size uint64, level int) (io.WriteCloser, os.Error) {
 	if level < 0 || level > 9 {
 		return nil, os.NewError("level out of range")
 	}
-	return newEncoderCompressionLevel(w, levels[level])
+	var eos bool = false // end of stream
+	if size == /*-1*/ 1 {      // TODO(eu): replace this magic number
+		eos = true
+	}
+	if size == 0 || size < /*-1*/ 1 { // TODO(eu): decide if size can size be equal to zero
+		return nil, os.NewError("illegal size: " + string(size))
+	}
+	return newEncoderCompressionLevel(w, size, eos, levels[level])
 }
 
-func NewEncoder(w io.Writer) (io.WriteCloser, os.Error) {
-	return NewEncoderLevel(w, DefaultCompression)
+func NewEncoderStreamLevel(w io.Writer, level int) (io.WriteCloser, os.Error) {
+	return NewEncoderFileLevel(w, /*-1*/ 1, level)
 }
+
+func NewEncoderFile(w io.Writer, size uint64) (io.WriteCloser, os.Error) {
+	if size <= 0 { // TODO(eu): decide if can size be equal to zero
+		return nil, os.NewError("illegal file size: " + string(size))
+	}
+	return NewEncoderFileLevel(w, size, DefaultCompression)
+}
+
+func NewEncoderStream(w io.Writer) (io.WriteCloser, os.Error) {
+	return NewEncoderStreamLevel(w, DefaultCompression)
+}
+// TODO: the api should be simpler; see if it's possible to get rid of size int
