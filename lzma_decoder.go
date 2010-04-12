@@ -57,14 +57,14 @@ type props struct {
 
 type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	// input sources
-	r io.Reader
+	r rangeDecoder
 	w io.Writer
 
 	// lzma header
 	prop       props
 	unpackSize int64
 
-	// hz
+/*	// hz
 	probs  *uint16
 	dic    *byte
 	buf    *byte
@@ -79,7 +79,7 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	needInitState int
 	numProbs      uint32
 	tempBufSize   uint
-	tempBuf       [lzmaMaxReqInputSize]byte
+	tempBuf       [lzmaMaxReqInputSize]byte*/
 
 	eos bool
 	err os.Error
@@ -87,6 +87,7 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 
 func (z *decoder) doDecode() (err os.Error) {
 
+	return nil
 }
 
 func (z *decoder) decodeProps(buf []byte) (err os.Error) {
@@ -94,16 +95,20 @@ func (z *decoder) decodeProps(buf []byte) (err os.Error) {
 	if d > (9 * 5 * 5) {
 		return os.NewError("illegal value of encoded lc, lp, pb byte")
 	}
-	z.p.lc = d % 9
+	z.prop.lc = d % 9
 	d /= 9
-	z.p.pb = d / 5
-	z.p.lp = d % 5
-	z.p.dicSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
+	z.prop.pb = d / 5
+	z.prop.lp = d % 5
+	z.prop.dicSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
 	return
 }
 
+// decoder initializes a decoder; it reads first 13 bytes from r which contain
+// lc, lp, pb, dicSize and unpackedSize; next creates a rangeDecoder; the
+// rangeDecoder should be created after lzmaHeader is read from r because
+// newRangeDecoder() further reads from the same stream 5 bytes to 
+// init rangeDecoder.code
 func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
-	z.r = r
 	z.w = w
 	header := make([]byte, lzmaHeaderSize)
 	n, err := r.Read(header)
@@ -111,10 +116,10 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 		return os.NewError("read " + string(n) + " bytes instead of " + string(lzmaHeaderSize))
 	}
 	if err != nil {
-		return err
+		return
 	}
 	if err := z.decodeProps(header); err != nil {
-		return err
+		return
 	}
 	for i := 0; i < 8; i++ {
 		z.unpackSize += int64(header[lzmaPropSize+i] << uint8(8*i))
@@ -123,9 +128,13 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 		z.eos = true
 	}
 	if err := z.doDecode(); err != nil {
-		return err
+		return
 	}
-	return nil
+	z.r, err = newRangeDecoder(r)
+	if err != nil {
+		return
+	}
+	return
 }
 
 func NewDecoder(r io.Reader) (io.ReadCloser, os.Error) {
