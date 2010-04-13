@@ -64,22 +64,22 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	prop       props
 	unpackSize int64
 
-/*	// hz
-	probs  *uint16
-	dic    *byte
-	buf    *byte
-	rrange uint32
-	code   uint32
-	dicPos uint32
-	// dicBufSize == prop.dicSize
-	processedPos  uint32
-	chechDicSize  uint32
-	state         uint
-	needFlush     int
-	needInitState int
-	numProbs      uint32
-	tempBufSize   uint
-	tempBuf       [lzmaMaxReqInputSize]byte*/
+	/*	// hz
+		probs  *uint16
+		dic    *byte
+		buf    *byte
+		rrange uint32
+		code   uint32
+		dicPos uint32
+		// dicBufSize == prop.dicSize
+		processedPos  uint32
+		chechDicSize  uint32
+		state         uint
+		needFlush     int
+		needInitState int
+		numProbs      uint32
+		tempBufSize   uint
+		tempBuf       [lzmaMaxReqInputSize]byte*/
 
 	eos bool
 	err os.Error
@@ -106,19 +106,19 @@ func (z *decoder) decodeProps(buf []byte) (err os.Error) {
 // decoder initializes a decoder; it reads first 13 bytes from r which contain
 // lc, lp, pb, dicSize and unpackedSize; next creates a rangeDecoder; the
 // rangeDecoder should be created after lzmaHeader is read from r because
-// newRangeDecoder() further reads from the same stream 5 bytes to 
+// newRangeDecoder() further reads from the same stream 5 bytes to
 // init rangeDecoder.code
 func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.w = w
 	header := make([]byte, lzmaHeaderSize)
 	n, err := r.Read(header)
-	if n != lzmaHeaderSize {
-		return os.NewError("read " + string(n) + " bytes instead of " + string(lzmaHeaderSize))
-	}
 	if err != nil {
 		return
 	}
-	if err := z.decodeProps(header); err != nil {
+	if n != lzmaHeaderSize {
+		return os.NewError("read " + string(n) + " bytes instead of " + string(lzmaHeaderSize))
+	}
+	if err = z.decodeProps(header); err != nil {
 		return
 	}
 	for i := 0; i < 8; i++ {
@@ -127,11 +127,12 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	if z.unpackSize == -1 {
 		z.eos = true
 	}
-	if err := z.doDecode(); err != nil {
-		return
-	}
 	z.r, err = newRangeDecoder(r)
 	if err != nil {
+		return
+	}
+
+	if err = z.doDecode(); err != nil {
 		return
 	}
 	return

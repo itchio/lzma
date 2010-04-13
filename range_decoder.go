@@ -37,11 +37,11 @@ func newRangeDecoder(r io.Reader) (rd rangeDecoder, err os.Error) {
 	rd.code = 0
 	buf := make([]byte, 5)
 	n, err := rd.r.Read(buf)
-	if n != len(buf) {
-		err = os.NewError("expected " + string(len(buf)) + " bytes, read " + string(n) + " bytes instead")
+	if err != nil {
 		return
 	}
-	if err != nil {
+	if n != len(buf) {
+		err = os.NewError("expected " + string(len(buf)) + " bytes, read " + string(n) + " bytes instead")
 		return
 	}
 	rd.code = uint32(buf[1]<<24) | uint32(buf[2]<<16) | uint32(buf[3]<<8) | uint32(buf[4])
