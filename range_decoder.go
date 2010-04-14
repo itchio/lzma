@@ -31,8 +31,8 @@ func makeReader(r io.Reader) Reader {
 	return bufio.NewReader(r)
 }
 
-func newRangeDecoder(r io.Reader) (rd rangeDecoder, err os.Error) {
-	rd = rangeDecoder{r: makeReader(r)}
+func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
+	rd = &rangeDecoder{r: makeReader(r)}
 	rd.rrange = 1<<32 - 1
 	rd.code = 0
 	buf := make([]byte, 5)

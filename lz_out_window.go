@@ -13,48 +13,49 @@ type lzOutWindow struct {
 	streamPos int
 }
 
-func newLzOutWindow(w io.Writer, windowSize int) (ow lzOutWindow) {
-	ow.w = w
-	ow.buf = make([]byte, windowSize)
-	ow.winSize = windowSize
-	ow.pos = 0
-	ow.streamPos = 0
-	return
+func newLzOutWindow(w io.Writer, windowSize int) *lzOutWindow {
+	return &lzOutWindow{
+		w:         w,
+		buf:       make([]byte, windowSize),
+		winSize:   windowSize,
+		pos:       0,
+		streamPos: 0,
+	}
 }
 
-func (ow *lzOutWindow) flush() (err os.Error) {
-	size := ow.pos - ow.streamPos
+func (outWin *lzOutWindow) flush() (err os.Error) {
+	size := outWin.pos - outWin.streamPos
 	if size == 0 {
 		return
 	}
-	n, err := ow.w.Write(ow.buf[ow.streamPos:ow.streamPos+size])
+	n, err := outWin.w.Write(outWin.buf[outWin.streamPos : outWin.streamPos+size])
 	if err != nil {
 		return
 	}
 	if n != size {
 		return os.NewError("expected to write " + string(size) + " bytes, written " + string(n) + " bytes")
 	}
-	if ow.pos >= ow.winSize {
-		ow.pos = 0
+	if outWin.pos >= outWin.winSize {
+		outWin.pos = 0
 	}
-	ow.streamPos = ow.pos
+	outWin.streamPos = outWin.pos
 	return
 }
 
-func (ow *lzOutWindow) copyBlock(distance int, length int) (err os.Error) {
-	pos := ow.pos - distance - 1
+func (outWin *lzOutWindow) copyBlock(distance int, length int) (err os.Error) {
+	pos := outWin.pos - distance - 1
 	if pos < 0 {
-		pos += ow.winSize
+		pos += outWin.winSize
 	}
-	for ;length != 0; length-- {
-		if pos >= ow.winSize {
+	for ; length != 0; length-- {
+		if pos >= outWin.winSize {
 			pos = 0
 		}
-		ow.pos++
+		outWin.pos++
 		pos++
-		ow.buf[ow.pos] = ow.buf[pos]
-		if ow.pos >= ow.winSize {
-			if err = ow.flush(); err != nil {
+		outWin.buf[outWin.pos] = outWin.buf[pos]
+		if outWin.pos >= outWin.winSize {
+			if err = outWin.flush(); err != nil {
 				return
 			}
 		}
@@ -62,22 +63,22 @@ func (ow *lzOutWindow) copyBlock(distance int, length int) (err os.Error) {
 	return
 }
 
-func (ow *lzOutWindow) putByte(b byte) (err os.Error) {
-	ow.pos++
-	ow.buf[ow.pos] = b
-	if ow.pos > ow.winSize {
-		if err = ow.flush(); err != nil {
+func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
+	outWin.pos++
+	outWin.buf[outWin.pos] = b
+	if outWin.pos > outWin.winSize {
+		if err = outWin.flush(); err != nil {
 			return
 		}
 	}
 	return
 }
 
-func (ow *lzOutWindow) getByte(distance int) (b byte) {
-	pos := ow.pos - distance - 1
+func (outWin *lzOutWindow) getByte(distance int) (b byte) {
+	pos := outWin.pos - distance - 1
 	if pos < 0 {
-		pos += ow.winSize
+		pos += outWin.winSize
 	}
-	b = ow.buf[pos]
+	b = outWin.buf[pos]
 	return
 }

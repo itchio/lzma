@@ -52,26 +52,46 @@ const (
 // lzma pproperties
 type props struct {
 	lc, lp, pb uint8
-	dicSize    uint32
+	dictSize   uint32
 }
 
 type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	// input sources
-	r rangeDecoder
+	r *rangeDecoder
 	w io.Writer
 
 	// lzma header
 	prop       props
 	unpackSize int64
 
-	/*	// hz
+	// hz
+	outWin *lzOutWindow
+
+	// hz
+	matchDecoders    []uint16
+	repDecoders      []uint16
+	repG0Decoders    []uint16
+	repG1Decoders    []uint16
+	repG2Decoders    []uint16
+	rep0LongDecoders []uint16
+	posSlotDecoders  []*rangeBitTreeDecoder
+	posPosDecoders   []uint16
+	posAlignDecoder  *rangeBitTreeDecoder
+	lenDecoder       *lenDecoder
+	repLenDecoder    *lenDecoder
+	litDecoder       *litDecoder
+	dictSizeCheck    uint32
+	posStateMask     uint32
+
+	/*
+		// hz
 		probs  *uint16
 		dic    *byte
 		buf    *byte
 		rrange uint32
 		code   uint32
 		dicPos uint32
-		// dicBufSize == prop.dicSize
+		// dicBufSize == prop.dictSize
 		processedPos  uint32
 		chechDicSize  uint32
 		state         uint
@@ -79,7 +99,8 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 		needInitState int
 		numProbs      uint32
 		tempBufSize   uint
-		tempBuf       [lzmaMaxReqInputSize]byte*/
+		tempBuf       [lzmaMaxReqInputSize]byte
+	*/
 
 	eos bool
 	err os.Error
@@ -99,12 +120,12 @@ func (z *decoder) decodeProps(buf []byte) (err os.Error) {
 	d /= 9
 	z.prop.pb = d / 5
 	z.prop.lp = d % 5
-	z.prop.dicSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
+	z.prop.dictSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
 	return
 }
 
 // decoder initializes a decoder; it reads first 13 bytes from r which contain
-// lc, lp, pb, dicSize and unpackedSize; next creates a rangeDecoder; the
+// lc, lp, pb, dictSize and unpackedSize; next creates a rangeDecoder; the
 // rangeDecoder should be created after lzmaHeader is read from r because
 // newRangeDecoder() further reads from the same stream 5 bytes to
 // init rangeDecoder.code

@@ -129,8 +129,8 @@ func NewEncoderFileLevel(w io.Writer, size uint64, level int) (io.WriteCloser, o
 	if level < 0 || level > 9 {
 		return nil, os.NewError("level out of range")
 	}
-	var eos bool = false // end of stream
-	if size == /*-1*/ 1 {      // TODO(eu): replace this magic number
+	var eos bool = false  // end of stream
+	if size == /*-1*/ 1 { // TODO(eu): replace this magic number
 		eos = true
 	}
 	if size == 0 || size < /*-1*/ 1 { // TODO(eu): decide if size can size be equal to zero
