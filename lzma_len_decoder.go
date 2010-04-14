@@ -7,10 +7,10 @@ type lenDecoder struct {
 	lowCoder     []*rangeBitTreeDecoder
 	midCoder     []*rangeBitTreeDecoder
 	highCoder    *rangeBitTreeDecoder
-	numPosStates int
+	numPosStates uint32
 }
 
-func newLenDecoder(numPosStates int) *lenDecoder {
+func newLenDecoder(numPosStates uint32) *lenDecoder {
 	ld := &lenDecoder{
 		choice:       initBitModels(2),
 		lowCoder:     make([]*rangeBitTreeDecoder, kNumPosStatesMax),
@@ -18,14 +18,14 @@ func newLenDecoder(numPosStates int) *lenDecoder {
 		highCoder:    newRangeBitTreeDecoder(kNumHighLenBits),
 		numPosStates: numPosStates,
 	}
-	for i := 0; i < numPosStates; i++ {
+	for i := uint32(0); i < numPosStates; i++ {
 		ld.lowCoder[i] = newRangeBitTreeDecoder(kNumLowLenBits)
 		ld.midCoder[i] = newRangeBitTreeDecoder(kNumMidLenBits)
 	}
 	return ld
 }
 
-func (ld *lenDecoder) decode(rd *rangeDecoder, posState int) (res uint32, err os.Error) {
+func (ld *lenDecoder) decode(rd *rangeDecoder, posState uint32) (res uint32, err os.Error) {
 	i, err := rd.decodeBit(ld.choice, 0)
 	if err != nil {
 		return

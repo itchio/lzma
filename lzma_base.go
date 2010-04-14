@@ -30,11 +30,11 @@ const (
 	kMatchMaxLen                    = kMatchMinLen + kNumLenSymbols - 1
 )
 
-func stateInit() int {
+func stateInit() uint32 {
 	return 0
 }
 
-func stateUpdateChar(index int) int {
+func stateUpdateChar(index uint32) uint32 {
 	if index < 4 {
 		return 0
 	}
@@ -44,35 +44,35 @@ func stateUpdateChar(index int) int {
 	return index - 6
 }
 
-func stateUpdateMatch(index int) int {
+func stateUpdateMatch(index uint32) uint32 {
 	if index < 7 {
 		return 7
 	}
 	return 10
 }
 
-func stateUpdateRep(index int) int {
+func stateUpdateRep(index uint32) uint32 {
 	if index < 7 {
 		return 8
 	}
 	return 11
 }
 
-func stateUpdateShortRep(index int) int {
+func stateUpdateShortRep(index uint32) uint32 {
 	if index < 7 {
 		return 9
 	}
 	return 11
 }
 
-func stateIsCharState(index int) bool {
+func stateIsCharState(index uint32) bool {
 	if index < 7 {
 		return true
 	}
 	return false
 }
 
-func getLenToPosState(length int) int {
+func getLenToPosState(length uint32) uint32 {
 	length -= kMatchMinLen
 	if length < kNumLenToPosStates {
 		return length

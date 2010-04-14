@@ -48,7 +48,7 @@ func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
 	return
 }
 
-func (rd *rangeDecoder) decodeDirectBits(numTotalBits int) (res uint32, err os.Error) {
+func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err os.Error) {
 	for i := numTotalBits; i != 0; i-- {
 		rd.rrange = rd.rrange >> 1
 		t := uint32(((rd.code - rd.rrange) >> 1))
@@ -66,7 +66,7 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits int) (res uint32, err os.E
 	return
 }
 
-func (rd *rangeDecoder) decodeBit(probs []uint16, index int) (res uint32, err os.Error) {
+func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err os.Error) {
 	prob := probs[index]
 	newBound := uint32((rd.rrange >> kNumBitModelTotalBits) * uint32(prob))
 	if (rd.code ^ 0x80000000) < (newBound ^ 0x80000000) {
@@ -98,10 +98,10 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index int) (res uint32, err os
 	return
 }
 
-func initBitModels(length int) (probs []uint16) {
-	probs = make([]uint16, length)
+func initBitModels(length uint32) (probs []uint16) {
+	probs = make([]uint16, int(length))
 	val := uint16(kBitModelTotal >> 1)
-	for i := 0; i < length; i++ {
+	for i := uint32(0); i < length; i++ {
 		probs[i] = val
 	}
 	return

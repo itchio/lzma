@@ -8,12 +8,12 @@ import (
 type lzOutWindow struct {
 	w         io.Writer
 	buf       []byte
-	winSize   int
-	pos       int
-	streamPos int
+	winSize   uint32
+	pos       uint32
+	streamPos uint32
 }
 
-func newLzOutWindow(w io.Writer, windowSize int) *lzOutWindow {
+func newLzOutWindow(w io.Writer, windowSize uint32) *lzOutWindow {
 	return &lzOutWindow{
 		w:         w,
 		buf:       make([]byte, windowSize),
@@ -32,7 +32,7 @@ func (outWin *lzOutWindow) flush() (err os.Error) {
 	if err != nil {
 		return
 	}
-	if n != size {
+	if uint32(n) != size {
 		return os.NewError("expected to write " + string(size) + " bytes, written " + string(n) + " bytes")
 	}
 	if outWin.pos >= outWin.winSize {
@@ -42,7 +42,7 @@ func (outWin *lzOutWindow) flush() (err os.Error) {
 	return
 }
 
-func (outWin *lzOutWindow) copyBlock(distance int, length int) (err os.Error) {
+func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
 	pos := outWin.pos - distance - 1
 	if pos < 0 {
 		pos += outWin.winSize
@@ -74,7 +74,7 @@ func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
 	return
 }
 
-func (outWin *lzOutWindow) getByte(distance int) (b byte) {
+func (outWin *lzOutWindow) getByte(distance uint32) (b byte) {
 	pos := outWin.pos - distance - 1
 	if pos < 0 {
 		pos += outWin.winSize

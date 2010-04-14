@@ -10,14 +10,14 @@ type rangeBitTreeDecoder struct {
 func newRangeBitTreeDecoder(numBitLevels uint32) *rangeBitTreeDecoder {
 	return &rangeBitTreeDecoder{
 		numBitLevels: numBitLevels,
-		models:       initBitModels(int(numBitLevels << 1)),
+		models:       initBitModels(numBitLevels << 1),
 	}
 }
 
 func (td *rangeBitTreeDecoder) decode(rd *rangeDecoder) (res uint32, err os.Error) {
 	res = 1
 	for bitIndex := td.numBitLevels; bitIndex != 0; bitIndex-- {
-		bit, err := rd.decodeBit(td.models, int(res))
+		bit, err := rd.decodeBit(td.models, res)
 		if err != nil {
 			return
 		}
@@ -31,7 +31,7 @@ func (td *rangeBitTreeDecoder) reverseDecode(rd *rangeDecoder) (res uint32, err 
 	index := uint32(1)
 	res = 0
 	for bitIndex := uint32(0); bitIndex < td.numBitLevels; bitIndex++ {
-		bit, err := rd.decodeBit(td.models, int(index))
+		bit, err := rd.decodeBit(td.models, index)
 		if err != nil {
 			return
 		}
@@ -41,11 +41,11 @@ func (td *rangeBitTreeDecoder) reverseDecode(rd *rangeDecoder) (res uint32, err 
 	return
 }
 
-func reverseDecodeIndex(rd *rangeDecoder, models []uint16, numBitModels uint32, startIndex int) (res uint32, err os.Error) {
+func reverseDecodeIndex(rd *rangeDecoder, models []uint16, numBitModels, startIndex uint32) (res uint32, err os.Error) {
 	index := uint32(1)
 	res = 0
 	for bitIndex := uint32(0); bitIndex < numBitModels; bitIndex++ {
-		bit, err := rd.decodeBit(models, startIndex+int(index))
+		bit, err := rd.decodeBit(models, startIndex+index)
 		if err != nil {
 			return
 		}
