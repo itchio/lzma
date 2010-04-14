@@ -41,11 +41,11 @@ func (td *rangeBitTreeDecoder) reverseDecode(rd *rangeDecoder) (res uint32, err 
 	return
 }
 
-func reverseDecodeIndex(rd *rangeDecoder, models []uint16, numBitModels, startIndex uint32) (res uint32, err os.Error) {
+func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex int32, numBitModels uint32) (res uint32, err os.Error) {
 	index := uint32(1)
 	res = 0
 	for bitIndex := uint32(0); bitIndex < numBitModels; bitIndex++ {
-		bit, err := rd.decodeBit(models, startIndex+index)
+		bit, err := rd.decodeBit(models, uint32(startIndex+int32(index)))
 		if err != nil {
 			return
 		}

@@ -43,12 +43,12 @@ func (outWin *lzOutWindow) flush() (err os.Error) {
 }
 
 func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
-	pos := outWin.pos - distance - 1
+	pos := int32(outWin.pos) - int32(distance) - 1
 	if pos < 0 {
-		pos += outWin.winSize
+		pos += int32(outWin.winSize)
 	}
 	for ; length != 0; length-- {
-		if pos >= outWin.winSize {
+		if pos >= int32(outWin.winSize) {
 			pos = 0
 		}
 		outWin.pos++
@@ -75,9 +75,9 @@ func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
 }
 
 func (outWin *lzOutWindow) getByte(distance uint32) (b byte) {
-	pos := outWin.pos - distance - 1
+	pos := int32(outWin.pos) - int32(distance) - 1
 	if pos < 0 {
-		pos += outWin.winSize
+		pos += int32(outWin.winSize)
 	}
 	b = outWin.buf[pos]
 	return

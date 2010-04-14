@@ -69,6 +69,6 @@ func newLitDecoder(numPosBits, numPrevBits uint32) *litDecoder {
 	return ld
 }
 
-func (ld *litDecoder) detDecoder(pos uint32, prevByte byte) *litDecoder2 {
+func (ld *litDecoder) getDecoder(pos uint32, prevByte byte) *litDecoder2 {
 	return ld.coders[((pos&ld.posMask)<<ld.numPrevBits)+uint32((prevByte&0xff)>>(8-ld.numPrevBits))]
 }

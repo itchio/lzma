@@ -20,8 +20,8 @@ type Reader interface {
 
 type rangeDecoder struct {
 	r      Reader
-	rrange uint32
-	code   uint32
+	rrange int32
+	code   int32
 }
 
 func makeReader(r io.Reader) Reader {
@@ -33,7 +33,7 @@ func makeReader(r io.Reader) Reader {
 
 func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
 	rd = &rangeDecoder{r: makeReader(r)}
-	rd.rrange = 1<<32 - 1
+	rd.rrange = -1
 	rd.code = 0
 	buf := make([]byte, 5)
 	n, err := rd.r.Read(buf)
@@ -44,22 +44,22 @@ func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
 		err = os.NewError("expected " + string(len(buf)) + " bytes, read " + string(n) + " bytes instead")
 		return
 	}
-	rd.code = uint32(buf[1]<<24) | uint32(buf[2]<<16) | uint32(buf[3]<<8) | uint32(buf[4])
+	rd.code = int32(uint32(buf[1]<<24) | uint32(buf[2]<<16) | uint32(buf[3]<<8) | uint32(buf[4]))
 	return
 }
 
 func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err os.Error) {
 	for i := numTotalBits; i != 0; i-- {
-		rd.rrange = rd.rrange >> 1
-		t := uint32(((rd.code - rd.rrange) >> 1))
-		rd.code -= rd.rrange & uint32(t-1)
-		res = (res << 1) | (1 - t)
-		if (rd.rrange & kTopMask) == 0 {
+		rd.rrange = int32(uint32(rd.rrange) >> 1)
+		t := int32(uint32(rd.code-rd.rrange) >> 1)
+		rd.code -= rd.rrange & (t - 1)
+		res = (res << 1) | uint32(1-t)
+		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte()
 			if err != nil {
 				return
 			}
-			rd.code = (rd.code << 8) | uint32(c)
+			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange = rd.rrange << 8
 		}
 	}
@@ -67,30 +67,30 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err o
 }
 
 func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err os.Error) {
-	prob := probs[index]
-	newBound := uint32((rd.rrange >> kNumBitModelTotalBits) * uint32(prob))
-	if (rd.code ^ 0x80000000) < (newBound ^ 0x80000000) {
+	prob := int32(probs[index])
+	newBound := int32(uint32(rd.rrange)>>kNumBitModelTotalBits) * prob
+	if rd.code^int32(-1<<31) < newBound^int32(-1<<31) {
 		rd.rrange = newBound
-		probs[index] = prob + uint16((kBitModelTotal-uint32(prob))>>kNumMoveBits)
-		if (rd.rrange & kTopMask) == 0 {
+		probs[index] = uint16(uint32(prob) + uint32(kBitModelTotal-uint32(prob))>>kNumMoveBits)
+		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte()
 			if err != nil {
 				return
 			}
-			rd.code = (rd.code << 8) | uint32(c)
+			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange = rd.rrange << 8
 		}
 		res = 0
 	} else {
 		rd.rrange -= newBound
 		rd.code -= newBound
-		probs[index] = prob - uint16(uint32(prob)>>kNumMoveBits)
-		if (rd.rrange & kTopMask) == 0 {
+		probs[index] = uint16(uint32(prob) - uint32(prob)>>kNumMoveBits)
+		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte()
 			if err != nil {
 				return
 			}
-			rd.code = (rd.code << 8) | uint32(c)
+			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange = rd.rrange << 8
 		}
 		res = 1
