@@ -39,6 +39,7 @@ package lzma
 import (
 	"io"
 	"os"
+	//"fmt"
 )
 
 const (
@@ -102,8 +103,10 @@ func (z *decoder) doDecode() (err os.Error) {
 		if res, err := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState); err != nil {
 			return
 		} else if res == 0 {
+			//fmt.Printf(" result from RD.Decoder.decodeBit(): res = %d\n", res)
 			ld2 := z.litDecoder.getDecoder(uint32(nowPos), prevByte)
-			if stateIsCharState(state) {
+			if !stateIsCharState(state) {
+				//fmt.Printf("lzma.decoder.doDecode() before ld2.decodeWithMatchByte(): rep0 = %d\n", rep0)
 				res, err := ld2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
 				if err != nil {
 					return
@@ -115,6 +118,7 @@ func (z *decoder) doDecode() (err os.Error) {
 					return
 				}
 				prevByte = byte(res)
+				//fmt.Printf("litDecoder.decodeNormal(): res = %d\n", prevByte)
 			}
 			err := z.outWin.putByte(prevByte)
 			if err != nil {
@@ -123,6 +127,7 @@ func (z *decoder) doDecode() (err os.Error) {
 			state = stateUpdateChar(state)
 			nowPos++
 		} else {
+			//fmt.Printf(" result from RD.Decoder.decodeBit(): res = %d\n", res)
 			var length uint32
 			if res, err := z.rd.decodeBit(z.repDecoders, state); err != nil {
 				return
@@ -203,15 +208,16 @@ func (z *decoder) doDecode() (err os.Error) {
 							if rep0 == -1 {
 								break
 							}
-							return os.NewError("error in data stream")
+							return os.NewError("error in data stream (checkpoint 1)")
 						}
 					}
 				} else {
 					rep0 = int32(posSlot)
 				}
 			}
-			if rep0 >= int32(nowPos) || rep0 >= int32(z.dictSizeCheck) {
-				return os.NewError("error in data stream")
+			//fmt.Printf("lzma.decoder.doDecode(): rep0 = %d, nowPos = %d, z.dictSizeCheck = %d\n", rep0, nowPos, z.dictSizeCheck)
+			if int64(rep0) >= nowPos || rep0 >= int32(z.dictSizeCheck) {
+				return os.NewError("error in data stream (checkpoint 2)")
 			}
 			if err := z.outWin.copyBlock(uint32(rep0), length); err != nil {
 				return
@@ -238,7 +244,11 @@ func (z *decoder) decodeProps(buf []byte) (err os.Error) {
 	if z.prop.lc > kNumLitContextBitsMax || z.prop.lp > 4 || z.prop.pb > kNumPosStatesBitsMax {
 		return os.NewError("illegal values of lc, lp or pb: " + string(z.prop.lc) + ", " + string(z.prop.lp) + ", " + string(z.prop.pb))
 	}
-	z.prop.dictSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
+	//z.prop.dictSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
+	for i := 0; i < 4; i++ {
+		z.prop.dictSize += uint32(buf[i + 1] & 0xff) << uint32(i * 8)
+	}
+	//fmt.Printf("lzma.decoder.decoder(): z.prop.dictSize = %d, z.prop.lc = %d, z.prop.lp = %d, z.prop.pb = %d\n", z.prop.dictSize, z.prop.lc, z.prop.lp, z.prop.pb)
 	return
 }
 

@@ -1,6 +1,9 @@
 package lzma
 
-import "os"
+import (
+	"os"
+	//"fmt"
+)
 
 type litDecoder2 struct {
 	decoders []uint16
@@ -26,8 +29,10 @@ func (ld2 *litDecoder2) decodeNormal(rd *rangeDecoder) (b byte, err os.Error) {
 
 func (ld2 *litDecoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) (b byte, err os.Error) {
 	symbol := uint32(1)
+	//fmt.Printf("litDecoder2.decodeWithMatchByte(): matchByte = %d, symbol = %d\n", matchByte, symbol)
 	for symbol < 0x100 {
 		matchBit := uint32((matchByte >> 7) & 1)
+		//fmt.Printf("litDecoder2.decodeWithMatchByte(): matchByte = %#x, symbol = %d, matchBit = %d\n",matchByte, symbol, matchBit)
 		matchByte = matchByte << 1
 		bit, err := rd.decodeBit(ld2.decoders, ((1+matchBit)<<8)+symbol)
 		if err != nil {
@@ -44,6 +49,7 @@ func (ld2 *litDecoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) (b
 			}
 			break
 		}
+		//fmt.Printf("litDecoder2.decodeWithMatchByte(): matchByte = %#x, symbol = %d, matchBit = %d, bit = %d\n",matchByte, symbol, matchBit, bit)
 	}
 	return byte(symbol), nil
 }

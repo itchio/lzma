@@ -2,6 +2,7 @@ package lzma
 
 import (
 	"bufio"
+	//"fmt"
 	"io"
 	"os"
 )
@@ -44,7 +45,10 @@ func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
 		err = os.NewError("expected " + string(len(buf)) + " bytes, read " + string(n) + " bytes instead")
 		return
 	}
-	rd.code = int32(uint32(buf[1]<<24) | uint32(buf[2]<<16) | uint32(buf[3]<<8) | uint32(buf[4]))
+	//rd.code = int32(uint32(buf[1]<<24) | uint32(buf[2]<<16) | uint32(buf[3]<<8) | uint32(buf[4]))
+	for i := 0; i < len(buf); i++ {
+		rd.code = rd.code<<8 | int32(buf[i])
+	}
 	return
 }
 
@@ -81,6 +85,9 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err
 			rd.rrange = rd.rrange << 8
 		}
 		res = 0
+		//fmt.Printf("rangeDecoder.decodeBit(): len(probs) = %d, index = %d, prob = %d, probs[index] = %d, "+
+		//	"res = %d, newBound = %d, Code = %d, Range = %d\n",
+		//	len(probs), index, prob, probs[index], res, newBound, rd.code, rd.rrange)
 	} else {
 		rd.rrange -= newBound
 		rd.code -= newBound
@@ -94,6 +101,9 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err
 			rd.rrange = rd.rrange << 8
 		}
 		res = 1
+		//fmt.Printf("rangeDecoder.decodeBit(): len(probs) = %d, index = %d, prob = %d, probs[index] = %d, "+
+		//	"res = %d, newBound = %d, Code = %d, Range = %d\n",
+		//	len(probs), index, prob, probs[index], res, newBound, rd.code, rd.rrange)
 	}
 	return
 }

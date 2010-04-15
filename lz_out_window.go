@@ -3,6 +3,7 @@ package lzma
 import (
 	"io"
 	"os"
+	//"fmt"
 )
 
 type lzOutWindow struct {
@@ -43,7 +44,7 @@ func (outWin *lzOutWindow) flush() (err os.Error) {
 }
 
 func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
-	pos := int32(outWin.pos) - int32(distance) - 1
+	pos := int32(int32(outWin.pos) - int32(distance) - 1)
 	if pos < 0 {
 		pos += int32(outWin.winSize)
 	}
@@ -51,21 +52,29 @@ func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
 		if pos >= int32(outWin.winSize) {
 			pos = 0
 		}
+		//fmt.Printf("outWin.copyBlock(), before buf: outWin.pos = %d, outWin.buf[outWin.pos] = %d, pos = %d\n", outWin.pos, outWin.buf[outWin.pos], pos)
+		//outWin.pos++
+		//pos++
+		outWin.buf[outWin.pos] = outWin.buf[pos]
 		outWin.pos++
 		pos++
-		outWin.buf[outWin.pos] = outWin.buf[pos]
+		//fmt.Printf("outWin.copyBlock(), after  buf: outWin.pos = %d, outWin.buf[outWin.pos] = %d, pos = %d\n", outWin.pos, outWin.buf[outWin.pos], pos)
 		if outWin.pos >= outWin.winSize {
 			if err = outWin.flush(); err != nil {
 				return
 			}
 		}
+		//fmt.Printf("outWin.copyBlock(): distance = %d, len = %d, pos = %d, outWin.pos = %d, outWin.winSize = %d, " +
+		//			"outWin.buf[outWin.pos] = %d\n", distance, length, pos, outWin.pos, outWin.winSize, outWin.buf[outWin.pos])
 	}
 	return
 }
 
 func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
-	outWin.pos++
+	//outWin.pos++
 	outWin.buf[outWin.pos] = b
+	outWin.pos++
+	//fmt.Printf("outWin.putByte(): b = %d, outWin.pos = %d, outWin.winSize = %d, len(outWin.buf) = %d\n", b, outWin.pos, outWin.winSize, len(outWin.buf))
 	if outWin.pos > outWin.winSize {
 		if err = outWin.flush(); err != nil {
 			return
@@ -75,10 +84,12 @@ func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
 }
 
 func (outWin *lzOutWindow) getByte(distance uint32) (b byte) {
-	pos := int32(outWin.pos) - int32(distance) - 1
+	pos := int32(int32(outWin.pos) - int32(distance) - 1)
 	if pos < 0 {
 		pos += int32(outWin.winSize)
 	}
 	b = outWin.buf[pos]
+	//fmt.Printf("outWin.getByte(): distance = %d, pos = %d, outWin.pos = %d, winSize = %d, b = %d, len(buf) = %d, outWin.streamPos = %d\n", 
+	//		distance, pos, outWin.pos, outWin.winSize, b, len(outWin.buf), outWin.streamPos)
 	return
 }

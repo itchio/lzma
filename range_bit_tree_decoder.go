@@ -1,6 +1,9 @@
 package lzma
 
-import "os"
+import (
+	"os"
+	//"fmt"
+)
 
 type rangeBitTreeDecoder struct {
 	models       []uint16
@@ -10,7 +13,7 @@ type rangeBitTreeDecoder struct {
 func newRangeBitTreeDecoder(numBitLevels uint32) *rangeBitTreeDecoder {
 	return &rangeBitTreeDecoder{
 		numBitLevels: numBitLevels,
-		models:       initBitModels(numBitLevels << 1),
+		models:       initBitModels(1 << numBitLevels),
 	}
 }
 
@@ -22,8 +25,10 @@ func (td *rangeBitTreeDecoder) decode(rd *rangeDecoder) (res uint32, err os.Erro
 			return
 		}
 		res = res<<1 + bit
+		//fmt.Printf("rangeBitTreeDecoder.decode(): numBitLevels = %d, bitIndex = %d, res = %d\n", td.numBitLevels, bitIndex, res)
 	}
 	res -= 1 << td.numBitLevels
+	//fmt.Printf("rangeBitTreeDecoder.decode():   res = %d\n", res)
 	return
 }
 
@@ -35,7 +40,8 @@ func (td *rangeBitTreeDecoder) reverseDecode(rd *rangeDecoder) (res uint32, err 
 		if err != nil {
 			return
 		}
-		index = index<<1 + bit
+		index = index << 1
+		index += bit
 		res = res | (bit << bitIndex)
 	}
 	return
@@ -49,7 +55,8 @@ func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex int32, num
 		if err != nil {
 			return
 		}
-		index = index<<1 + bit
+		index = index << 1
+		index += bit
 		res = res | (bit << bitIndex)
 	}
 	return
