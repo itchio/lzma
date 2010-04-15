@@ -47,6 +47,7 @@ func (ld2 *litDecoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) (b
 				}
 				symbol = (symbol << 1) | i
 			}
+			//fmt.Printf("lzma.litDecoder.decodeWithDirectMatchByte(): break here\n")
 			break
 		}
 		//fmt.Printf("litDecoder2.decodeWithMatchByte(): matchByte = %#x, symbol = %d, matchBit = %d, bit = %d\n",matchByte, symbol, matchBit, bit)

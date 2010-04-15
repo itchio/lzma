@@ -83,10 +83,6 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	litDecoder       *litDecoder
 	dictSizeCheck    uint32
 	posStateMask     uint32
-
-	// hz
-	eos bool
-	err os.Error
 }
 
 func (z *decoder) doDecode() (err os.Error) {
@@ -99,6 +95,7 @@ func (z *decoder) doDecode() (err os.Error) {
 	var prevByte byte = 0
 
 	for z.unpackSize < 0 || nowPos < z.unpackSize {
+		//fmt.Printf("lzma.decoder.doDecode(), beggining of main loop: nowPos = %d, unpackSize = %d\n", nowPos, z.unpackSize)
 		posState := uint32(nowPos) & z.posStateMask
 		if res, err := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState); err != nil {
 			return
@@ -187,25 +184,40 @@ func (z *decoder) doDecode() (err os.Error) {
 				if posSlot >= kStartPosModelIndex {
 					numDirectBits := uint32(posSlot>>1 - 1)
 					rep0 = int32((2 | posSlot&1) << numDirectBits)
+					//fmt.Printf("lzma.decoder.doDecode(), inside of main loop: posSlot = %d, numDirectBits = %d, " +
+					//			"rep0 = %d\n", posSlot, numDirectBits, rep0)
 					if posSlot < kEndPosModelIndex {
 						res, err := reverseDecodeIndex(z.rd, z.posDecoders, rep0-int32(posSlot)-1, numDirectBits)
 						if err != nil {
 							return
 						}
 						rep0 += int32(res)
+						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [0]: posSlot = %d, numDirectBits = %d, " +
+						//		"rep0 = %d\n", posSlot, numDirectBits, rep0)
 					} else {
+						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [1]: posSlot = %d, numDirectBits = %d, " +
+						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
 						res, err := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)
 						if err != nil {
 							return
 						}
+						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [2]: posSlot = %d, numDirectBits = %d, " +
+						//                "rep0 = %d, res = %d\n", posSlot, numDirectBits, rep0, res)
 						rep0 += int32(res << kNumAlignBits)
+						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [3]: posSlot = %d, numDirectBits = %d, " +
+						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
 						res, err = z.posAlignDecoder.reverseDecode(z.rd)
 						if err != nil {
 							return
 						}
+						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [4]: posSlot = %d, numDirectBits = %d, " +
+						//                "rep0 = %d, res = %d\n", posSlot, numDirectBits, rep0, res)
 						rep0 += int32(res)
+						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [5]: posSlot = %d, numDirectBits = %d, " +
+						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
 						if rep0 < 0 {
 							if rep0 == -1 {
+								//fmt.Printf("lzma.decoder.doDecode() rep0 == -1, break here\n")
 								break
 							}
 							return os.NewError("error in data stream (checkpoint 1)")
@@ -246,9 +258,9 @@ func (z *decoder) decodeProps(buf []byte) (err os.Error) {
 	}
 	//z.prop.dictSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
 	for i := 0; i < 4; i++ {
-		z.prop.dictSize += uint32(buf[i + 1] & 0xff) << uint32(i * 8)
+		z.prop.dictSize += uint32(buf[i+1]&0xff) << uint32(i*8)
 	}
-	//fmt.Printf("lzma.decoder.decoder(): z.prop.dictSize = %d, z.prop.lc = %d, z.prop.lp = %d, z.prop.pb = %d\n", z.prop.dictSize, z.prop.lc, z.prop.lp, z.prop.pb)
+	//fmt.Printf("lzma.decoder.decodeProps(): z.prop.dictSize = %d, z.prop.lc = %d, z.prop.lp = %d, z.prop.pb = %d\n", z.prop.dictSize, z.prop.lc, z.prop.lp, z.prop.pb)
 	return
 }
 
@@ -278,14 +290,15 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	}
 
 	// z.unpackSize
+	z.unpackSize = 0
 	for i := 0; i < 8; i++ {
-		z.unpackSize += int64(header[lzmaPropSize+i] << uint8(8*i))
+		b := header[lzmaPropSize+i]
+		if int32(b) < 0 {
+			return os.NewError("can't read stream size")
+		}
+		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
 	}
-
-	// z.eos
-	if z.unpackSize == -1 {
-		z.eos = true
-	}
+	//fmt.Printf("lzma.decoder.decoder(): z.unpackSize = %d\n", z.unpackSize)
 
 	// z.rd	// do not move before z.prop
 	z.rd, err = newRangeDecoder(r)
@@ -356,12 +369,12 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	return
 }
 
-func NewDecoder(r io.Reader) (io.ReadCloser, os.Error) {
+func NewDecoder(r io.Reader) io.ReadCloser {
 	var z decoder
 	pr, pw := io.Pipe()
 	go func() {
 		err := z.decoder(r, pw)
 		pw.CloseWithError(err)
 	}()
-	return pr, nil
+	return pr
 }

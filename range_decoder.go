@@ -53,11 +53,15 @@ func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
 }
 
 func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err os.Error) {
+	//fmt.Printf("rd.decoder.decodeDirectBits() [0]: numTotalBits = %d, Range = %d, Code = %d\n",
+	//			numTotalBits, rd.rrange, rd.code)
 	for i := numTotalBits; i != 0; i-- {
 		rd.rrange = int32(uint32(rd.rrange) >> 1)
-		t := int32(uint32(rd.code-rd.rrange) >> 1)
+		t := int32(uint32(rd.code-rd.rrange) >> 31)
 		rd.code -= rd.rrange & (t - 1)
 		res = (res << 1) | uint32(1-t)
+		//fmt.Printf("rd.decoder.decodeDirectBits() [1]: numTotalBits = %d, Range = %d, Code = %d, result = %d, t = %d\n",
+	        //                        numTotalBits, rd.rrange, rd.code, res, t)
 		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte()
 			if err != nil {
@@ -65,8 +69,12 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err o
 			}
 			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange = rd.rrange << 8
+			//fmt.Printf("rd.decoder.decodeDirectBits() [2]: numTotalBits = %d, Range = %d, Code = %d, result = %d, t = %d\n",
+		        //                        numTotalBits, rd.rrange, rd.code, res, t)
 		}
 	}
+	//fmt.Printf("rd.decoder.decodeDirectBits() [3]: numTotalBits = %d, Range = %d, Code = %d, result = %d\n",
+	//			numTotalBits, rd.rrange, rd.code, res)
 	return
 }
 

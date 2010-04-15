@@ -53,8 +53,6 @@ func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
 			pos = 0
 		}
 		//fmt.Printf("outWin.copyBlock(), before buf: outWin.pos = %d, outWin.buf[outWin.pos] = %d, pos = %d\n", outWin.pos, outWin.buf[outWin.pos], pos)
-		//outWin.pos++
-		//pos++
 		outWin.buf[outWin.pos] = outWin.buf[pos]
 		outWin.pos++
 		pos++
@@ -71,12 +69,15 @@ func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
 }
 
 func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
-	//outWin.pos++
+	//if (outWin.winSize - outWin.pos) < 10 {
+	//	fmt.Printf("outWin.putByte(): b = %d, outWin.pos = %d, outWin.winSize = %d, len(outWin.buf) = %d\n", b, outWin.pos, outWin.winSize, len(outWin.buf))
+	//}
 	outWin.buf[outWin.pos] = b
 	outWin.pos++
 	//fmt.Printf("outWin.putByte(): b = %d, outWin.pos = %d, outWin.winSize = %d, len(outWin.buf) = %d\n", b, outWin.pos, outWin.winSize, len(outWin.buf))
-	if outWin.pos > outWin.winSize {
-		if err = outWin.flush(); err != nil {
+	if outWin.pos >= outWin.winSize {
+		err = outWin.flush()
+		if err != nil {
 			return
 		}
 	}
