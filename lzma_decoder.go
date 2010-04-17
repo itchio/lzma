@@ -2,7 +2,7 @@
 The lzma package implements reading and writing of LZMA
 format compressed data originaly developed by Igor Pavlov.
 As reference implementations have been taken LZMA SDK version 4.65
-that can be found at:
+available online at:
 
   http://www.7-zip.org/sdk.html
 
@@ -10,29 +10,6 @@ Note that LZMA doesn't store any metadata about the file. Neither can
 it compress multiple files because it's not an archiving format. Both
 these issues are solved if the file or files are archived with tar
 before compression with LZMA.
-
-LZMA compressed file format
----------------------------
-Offset Size Description
-  0     1   Special LZMA properties (lc,lp, pb in encoded form)
-  1     4   Dictionary size (little endian)
-  5     8   Uncompressed size (little endian). -1 means unknown size
- 13         Compressed data
-
-The implementation provides filters that uncompress during reading
-and compress during writing.  For example, to write compressed data
-to a buffer:
-
-        var b bytes.Buffer
-        w, err := lzma.NewEncoder(&b)
-        w.Write([]byte("hello, world\n"))
-        w.Close()
-
-and to read that data back:
-
-        r, err := lzma.NewDecoder(&b)
-        io.Copy(os.Stdout, r)
-        r.Close()
 */
 package lzma
 
@@ -49,6 +26,14 @@ const (
 	lzmaHeaderSize      = lzmaPropSize + 8
 	lzmaMaxReqInputSize = 20
 )
+
+// LZMA compressed file format
+// ---------------------------
+// Offset Size Description
+//   0     1   Special LZMA properties (lc,lp, pb in encoded form)
+//   1     4   Dictionary size (little endian)
+//   5     8   Uncompressed size (little endian). -1 means unknown size
+//  13         Compressed data
 
 // lzma pproperties
 type props struct {
