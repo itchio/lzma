@@ -10,7 +10,7 @@ import (
 const (
 	kTopMask              uint32 = 0xff000000 // int32(-1 << 24)
 	kNumBitModelTotalBits uint32 = 11
-	kBitModelTotal        uint32 = 1 << 11
+	kBitModelTotal        uint32 = 1 << kNumBitModelTotalBits
 	kNumMoveBits          uint32 = 5
 )
 
@@ -79,11 +79,12 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err o
 }
 
 func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err os.Error) {
-	prob := int32(probs[index])
-	newBound := int32(uint32(rd.rrange)>>kNumBitModelTotalBits) * prob
+	//prob := int32(probs[index])
+	prob := probs[index]
+	newBound := int32(uint32(rd.rrange)>>kNumBitModelTotalBits) * int32(prob)
 	if rd.code^int32(-1<<31) < newBound^int32(-1<<31) {
 		rd.rrange = newBound
-		probs[index] = uint16(uint32(prob) + uint32(kBitModelTotal-uint32(prob))>>kNumMoveBits)
+		probs[index] = prob + (uint16(kBitModelTotal)-prob)>>kNumMoveBits
 		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte()
 			if err != nil {
@@ -99,14 +100,14 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err
 	} else {
 		rd.rrange -= newBound
 		rd.code -= newBound
-		probs[index] = uint16(uint32(prob) - uint32(prob)>>kNumMoveBits)
+		probs[index] = prob - prob>>kNumMoveBits
 		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte()
 			if err != nil {
 				return
 			}
 			rd.code = (rd.code << 8) | int32(c)
-			rd.rrange = rd.rrange << 8
+			rd.rrange <<= 8
 		}
 		res = 1
 		//fmt.Printf("rangeDecoder.decodeBit(): len(probs) = %d, index = %d, prob = %d, probs[index] = %d, "+
