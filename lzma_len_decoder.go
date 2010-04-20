@@ -4,23 +4,23 @@ import "os"
 
 type lenDecoder struct {
 	choice       []uint16
-	lowCoder     []*rangeBitTreeDecoder
-	midCoder     []*rangeBitTreeDecoder
-	highCoder    *rangeBitTreeDecoder
+	lowCoder     []*rangeBitTreeCoder
+	midCoder     []*rangeBitTreeCoder
+	highCoder    *rangeBitTreeCoder
 	numPosStates uint32
 }
 
 func newLenDecoder(numPosStates uint32) *lenDecoder {
 	ld := &lenDecoder{
 		choice:       initBitModels(2),
-		lowCoder:     make([]*rangeBitTreeDecoder, kNumPosStatesMax),
-		midCoder:     make([]*rangeBitTreeDecoder, kNumPosStatesMax),
-		highCoder:    newRangeBitTreeDecoder(kNumHighLenBits),
+		lowCoder:     make([]*rangeBitTreeCoder, kNumPosStatesMax),
+		midCoder:     make([]*rangeBitTreeCoder, kNumPosStatesMax),
+		highCoder:    newRangeBitTreeCoder(kNumHighLenBits),
 		numPosStates: numPosStates,
 	}
 	for i := uint32(0); i < numPosStates; i++ {
-		ld.lowCoder[i] = newRangeBitTreeDecoder(kNumLowLenBits)
-		ld.midCoder[i] = newRangeBitTreeDecoder(kNumMidLenBits)
+		ld.lowCoder[i] = newRangeBitTreeCoder(kNumLowLenBits)
+		ld.midCoder[i] = newRangeBitTreeCoder(kNumMidLenBits)
 	}
 	return ld
 }

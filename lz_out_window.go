@@ -90,7 +90,7 @@ func (outWin *lzOutWindow) getByte(distance uint32) (b byte) {
 		pos += int32(outWin.winSize)
 	}
 	b = outWin.buf[pos]
-	//fmt.Printf("outWin.getByte(): distance = %d, pos = %d, outWin.pos = %d, winSize = %d, b = %d, len(buf) = %d, outWin.streamPos = %d\n", 
+	//fmt.Printf("outWin.getByte(): distance = %d, pos = %d, outWin.pos = %d, winSize = %d, b = %d, len(buf) = %d, outWin.streamPos = %d\n",
 	//		distance, pos, outWin.pos, outWin.winSize, b, len(outWin.buf), outWin.streamPos)
 	return
 }

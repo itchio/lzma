@@ -60,9 +60,9 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	repG1Decoders    []uint16
 	repG2Decoders    []uint16
 	rep0LongDecoders []uint16
-	posSlotDecoders  []*rangeBitTreeDecoder
+	posSlotDecoders  []*rangeBitTreeCoder
 	posDecoders      []uint16
-	posAlignDecoder  *rangeBitTreeDecoder
+	posAlignDecoder  *rangeBitTreeCoder
 	lenDecoder       *lenDecoder
 	repLenDecoder    *lenDecoder
 	litDecoder       *litDecoder
@@ -339,13 +339,13 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.posDecoders = initBitModels(kNumFullDistances - kEndPosModelIndex)
 
 	// z.posSlotDecoders
-	z.posSlotDecoders = make([]*rangeBitTreeDecoder, kNumLenToPosStates)
+	z.posSlotDecoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
 	for i := 0; i < kNumLenToPosStates; i++ {
-		z.posSlotDecoders[i] = newRangeBitTreeDecoder(kNumPosSlotBits)
+		z.posSlotDecoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
 
 	// z.posAlignDecoder
-	z.posAlignDecoder = newRangeBitTreeDecoder(kNumAlignBits)
+	z.posAlignDecoder = newRangeBitTreeCoder(kNumAlignBits)
 
 	// start decoding data
 	if err = z.doDecode(); err != nil {

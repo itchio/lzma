@@ -101,18 +101,18 @@ func (re *rangeEncoder) processedSize() uint64 {
 	return uint64(re.cacheSize) + re.pos + 4
 }
 
-func (re *rangeEncoder) encode(probs []uint16, index uint32, symbol int32) (err os.Error) {
+func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Error) {
 	prob := probs[index]
-	newBound := int32(uint32(re.rrange) >> kNumBitModelTotalBits) * int32(prob)
+	newBound := int32(uint32(re.rrange)>>kNumBitModelTotalBits) * int32(prob)
 	if symbol == 0 {
 		re.rrange = newBound
-		probs[index] = prob + (uint16(kBitModelTotal) - prob) >> kNumMoveBits
+		probs[index] = prob + (uint16(kBitModelTotal)-prob)>>kNumMoveBits
 	} else {
 		re.low += uint64(newBound) & uint64(0xffffffff)
 		re.rrange -= newBound
-		probs[index] = prob - prob >> kNumMoveBits
+		probs[index] = prob - prob>>kNumMoveBits
 	}
-	if uint32(re.rrange) & kTopMask == 0 {
+	if uint32(re.rrange)&kTopMask == 0 {
 		re.rrange <<= 8
 		err := re.shiftLow()
 		if err != nil {
@@ -122,25 +122,30 @@ func (re *rangeEncoder) encode(probs []uint16, index uint32, symbol int32) (err 
 	return
 }
 
+// fill probPrices with values, which are allways less than max(uint16)
+// TODO: consider changing type of probPrices to []uint16
 func init() {
 	kNumBits := kNumBitModelTotalBits - kNumMoveReducingBits
 	for i := kNumBits; i >= 0; i-- {
 		start := uint32(1) << (kNumBits - i - 1)
 		end := uint32(1) << (kNumBits - i)
 		for j := start; j < end; j++ {
-			probPrices[j] = i << kNumBitPriceShiftBits + ((end - j) << kNumBitPriceShiftBits) >> (kNumBits -i -1)
+			probPrices[j] = i<<kNumBitPriceShiftBits + ((end-j)<<kNumBitPriceShiftBits)>>(kNumBits-i-1)
 		}
 	}
 }
 
+// prob and symbol are allways less that max(uint16)
 func getPrice(prob, symbol uint32) uint32 {
-	return probPrices[uint32(((prob - symbol) ^ (-symbol)) & (kBitModelTotal - 1)) >> kNumMoveReducingBits]
+	return probPrices[uint32(((prob-symbol)^(-symbol))&(kBitModelTotal-1))>>kNumMoveReducingBits]
 }
 
+// prob is allways less than max(uint16)
 func getPrice0(prob uint32) uint32 {
-	return probPrices[prob >> kNumMoveReducingBits]
+	return probPrices[prob>>kNumMoveReducingBits]
 }
 
+// prob is allways less than max(uint16)
 func getPrice1(prob uint32) uint32 {
-	return probPrices[(kBitModelTotal - prob) >> kNumMoveReducingBits]
+	return probPrices[(kBitModelTotal-prob)>>kNumMoveReducingBits]
 }
