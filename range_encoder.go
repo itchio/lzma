@@ -11,8 +11,6 @@ const (
 	kNumBitPriceShiftBits uint32 = 6
 )
 
-var probPrices [kBitModelTotal >> kNumMoveReducingBits]uint32
-
 type Writer interface {
 	io.Writer
 	Flush() os.Error
@@ -122,15 +120,20 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 	return
 }
 
-// fill probPrices with values, which are allways less than max(uint16)
-// TODO: consider changing type of probPrices to []uint16
-func init() {
+
+var probPrices []uint32 = make([]uint32, kBitModelTotal>>kNumMoveReducingBits) // len is currently 512
+
+// Filling probPrices with values, which are allways less than max(uint16).
+// This function is called once, and could be an init() function, but it's
+// needed only for the encoder and would introduse overhead for the decoder.
+// Therefore it should be called in the encoder's contructor.
+func initProbPrices() {
 	kNumBits := kNumBitModelTotalBits - kNumMoveReducingBits
-	for i := kNumBits; i >= 0; i-- {
-		start := uint32(1) << (kNumBits - i - 1)
-		end := uint32(1) << (kNumBits - i)
+	for i := int32(kNumBits - 1); i >= 0; i-- {
+		start := uint32(1) << (kNumBits - uint32(i) - 1)
+		end := uint32(1) << (kNumBits - uint32(i))
 		for j := start; j < end; j++ {
-			probPrices[j] = i<<kNumBitPriceShiftBits + ((end-j)<<kNumBitPriceShiftBits)>>(kNumBits-i-1)
+			probPrices[j] = uint32(i)<<kNumBitPriceShiftBits + ((end-j)<<kNumBitPriceShiftBits)>>(kNumBits-uint32(i)-1)
 		}
 	}
 }

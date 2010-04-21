@@ -64,7 +64,7 @@ var levels = []compressionLevel{
 
 func (cl compressionLevel) checkValues() os.Error {
 	// (1 << 29) bytes or 512 MiB in Java version
-	// (1 << 30) bytes or 1 GiB in C version
+	// (1 << 30) bytes or 1 GiB in ANSI C version
 	// (1 << 32) bytes or 4 GiB theoretical maximum
 	if cl.dictSize < 0 || cl.dictSize > 29 {
 		return os.NewError("dictionary size out of range: " + string(cl.dictSize))
@@ -82,6 +82,7 @@ func (cl compressionLevel) checkValues() os.Error {
 	if cl.posBits < 0 || cl.posBits > 4 {
 		return os.NewError("number of position bits out of range: " + string(cl.posBits))
 	}
+	// the hash size used in the bin tree (2 and 4 bytes respectively)
 	if cl.matchFinder != "bt2" || cl.matchFinder != "bt4" {
 		return os.NewError("unsuported match finder: " + cl.matchFinder)
 	}
@@ -98,6 +99,7 @@ type encoder struct { // flate.deflater, zlib.writer, gzip.deflater
 }
 
 func (z *encoder) encoder(r io.Reader, w io.Writer, size uint64, eos bool, cl compressionLevel) (err os.Error) {
+	initProbPrices()
 	// set z fields
 	z.cl = cl
 	z.w = w
@@ -130,7 +132,7 @@ func NewEncoderFileLevel(w io.Writer, size uint64, level int) (io.WriteCloser, o
 		return nil, os.NewError("level out of range")
 	}
 	var eos bool = false  // end of stream
-	if size == /*-1*/ 1 { // TODO(eu): replace this magic number
+	if size == /*-1*/ 1 { // TODO(eu): replace this magic number	// TODO(eu): why did i comment -1 ?
 		eos = true
 	}
 	if size == 0 || size < /*-1*/ 1 { // TODO(eu): decide if size can size be equal to zero
