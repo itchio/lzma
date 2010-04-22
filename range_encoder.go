@@ -123,10 +123,7 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 
 var probPrices []uint32 = make([]uint32, kBitModelTotal>>kNumMoveReducingBits) // len is currently 512
 
-// Filling probPrices with values, which are allways less than max(uint16).
-// This function is called once, and could be an init() function, but it's
-// needed only for the encoder and would introduse overhead for the decoder.
-// Therefore it should be called in the encoder's contructor.
+// should be called in the encoder's contructor.
 func initProbPrices() {
 	kNumBits := kNumBitModelTotalBits - kNumMoveReducingBits
 	for i := int32(kNumBits - 1); i >= 0; i-- {

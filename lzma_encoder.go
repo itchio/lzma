@@ -8,7 +8,7 @@ import (
 const (
 	BestSpeed          = 1
 	BestCompression    = 9
-	DefaultCompression = 7
+	DefaultCompression = 6
 )
 
 type syncPipeReader struct {
@@ -40,36 +40,37 @@ func syncPipe() (*syncPipeReader, *syncPipeWriter) {
 	return sr, sw
 }
 
+
 type compressionLevel struct {
-	dictSize           uint32 // d, dictionary size, computed as (1 << d)
-	fastBytes          uint32 // fb, number of fast bytes
-	literalContextBits uint32 // lc, number of literal context bits
-	literalPosBits     uint32 // lp, number of literal pos bits
-	posBits            uint32 // pb, number of pos bits
-	matchFinder        string // mf, Match Finder
+	//compressionMode    uint32 // compression mode // a
+	dictSize  uint32 // dictionary size, computed as (1 << d) // d
+	fastBytes uint32 // number of fast bytes // fb
+	//matchCycles        uint32 // number of cycles for match finder // mc
+	literalContextBits uint32 // number of literal context bits // lc
+	literalPosBits     uint32 // number of literal pos bits // lp
+	posBits            uint32 // number of pos bits // pb
+	matchFinder        string // match finder // mf
 }
 
-var levels = []compressionLevel{
-	compressionLevel{},                        // 0
-	compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
-	compressionLevel{18, 64, 3, 0, 2, "bt4"},  // 2
-	compressionLevel{19, 64, 3, 0, 2, "bt4"},  // 3
-	compressionLevel{20, 64, 3, 0, 2, "bt4"},  // 4
-	compressionLevel{21, 128, 3, 0, 2, "bt4"}, // 5
-	compressionLevel{22, 128, 3, 0, 2, "bt4"}, // 6
-	compressionLevel{23, 128, 3, 0, 2, "bt4"}, // 7
-	compressionLevel{24, 255, 3, 0, 2, "bt4"}, // 8
-	compressionLevel{25, 255, 3, 0, 2, "bt4"}, // 9
+var levels = []*compressionLevel{
+	&compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
+	&compressionLevel{18, 64, 3, 0, 2, "bt4"},  // 2
+	&compressionLevel{20, 64, 3, 0, 2, "bt4"},  // 3
+	&compressionLevel{22, 64, 3, 0, 2, "bt4"},  // 4
+	&compressionLevel{23, 128, 3, 0, 2, "bt4"}, // 5
+	&compressionLevel{24, 128, 3, 0, 2, "bt4"}, // 6
+	&compressionLevel{25, 128, 3, 0, 2, "bt4"}, // 7
+	&compressionLevel{26, 255, 3, 0, 2, "bt4"}, // 8
+	&compressionLevel{27, 255, 3, 0, 2, "bt4"}, // 9
 }
 
-func (cl compressionLevel) checkValues() os.Error {
-	// (1 << 29) bytes or 512 MiB in Java version
-	// (1 << 30) bytes or 1 GiB in ANSI C version
-	// (1 << 32) bytes or 4 GiB theoretical maximum
-	if cl.dictSize < 0 || cl.dictSize > 29 {
+func (cl *compressionLevel) checkValues() os.Error {
+	// 1 << 29 bytes or 512 MiB in Java version
+	// 1 << 30 bytes or 1 GiB in ANSI C version
+	// 1 << 32 bytes or 4 GiB theoretical maximum
+	if cl.dictSize < 12 || cl.dictSize > 29 {
 		return os.NewError("dictionary size out of range: " + string(cl.dictSize))
 	}
-	// TODO(eu): replace magic numbers with constants
 	if cl.fastBytes < 5 || cl.fastBytes > 273 {
 		return os.NewError("number of fast bytes out of range: " + string(cl.fastBytes))
 	}
@@ -82,77 +83,152 @@ func (cl compressionLevel) checkValues() os.Error {
 	if cl.posBits < 0 || cl.posBits > 4 {
 		return os.NewError("number of position bits out of range: " + string(cl.posBits))
 	}
-	// the hash size used in the bin tree (2 and 4 bytes respectively)
-	if cl.matchFinder != "bt2" || cl.matchFinder != "bt4" {
+	if cl.matchFinder != "bt2" || cl.matchFinder != "bt4" { // there are also bt3 and hc4, but will implrement them later
 		return os.NewError("unsuported match finder: " + cl.matchFinder)
 	}
 	return nil
 }
 
-type encoder struct { // flate.deflater, zlib.writer, gzip.deflater
-	cl   compressionLevel
+
+const (
+	eMatchFinderTypeBT2  int32 = 0
+	eMatchFinderTypeBT4  int32 = 1
+	kIfinityPrice        int32 = 0xFFFFFFF
+	kDefaultDicLogSize   int32 = 22
+	kNumFastBytesDefault int32 = 0x20
+)
+
+var gFastPos []byte = make([]byte, 1<<11)
+
+// should be called in the encoder's contructor
+func initGFastPos() {
+	kFastSlots := 22
+	c := 2
+	gFastPos[0] = 0
+	gFastPos[1] = 1
+	for slotFast := 2; slotFast < kFastSlots; slotFast++ {
+		k := 1 << uint(slotFast>>1-1)
+		for j := 0; j < k; j, c = j+1, c+1 {
+			gFastPos[c] = byte(slotFast)
+		}
+	}
+}
+
+func getPosSlot(pos int32) int32 {
+	if pos < 1<<11 {
+		return int32(gFastPos[pos])
+	}
+	if pos < 1<<21 {
+		return int32(gFastPos[pos>>10] + 20)
+	}
+	return int32(gFastPos[pos>>20] + 40)
+}
+
+func getPosSlot2(pos int32) int32 {
+	if pos < 1<<17 {
+		return int32(gFastPos[pos>>6] + 16)
+	}
+	if pos < 1<<27 {
+		return int32(gFastPos[pos>>16] + 32)
+	}
+	return int32(gFastPos[pos>>26] + 52)
+}
+
+
+type encoder struct {
 	w    io.Writer
 	r    io.Reader
-	size uint64
+	cl   *compressionLevel
+	size int64
 	eos  bool
-	err  os.Error
+
+	state        int32
+	prevByte     byte
+	repDistances []int32
 }
 
-func (z *encoder) encoder(r io.Reader, w io.Writer, size uint64, eos bool, cl compressionLevel) (err os.Error) {
-	initProbPrices()
-	// set z fields
-	z.cl = cl
+func (z *encoder) doEncode() (err os.Error) {
+	return
+}
+
+func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err os.Error) {
 	z.w = w
 	z.r = r
-	z.size = size
-	z.eos = eos
-	// start encoding
-	//blablabla
 
-	return nil
+	if level < 1 || level > 9 {
+		return os.NewError("level out of range: " + string(level))
+	}
+	z.cl = levels[level]
+	err = z.cl.checkValues()
+	if err != nil {
+		return
+	}
+	z.cl.dictSize = 1 << z.cl.dictSize
+
+	if size < -1 { // -1 stands for unknown size, but can the size be equal to zero ?
+		return os.NewError("illegal size: " + string(size))
+	}
+	z.size = size
+
+	z.eos = false
+	if z.size == -1 {
+		z.eos = true
+	}
+
+	z.state = 0
+	z.prevByte = 0
+	for i := 0; i < kNumRepDistances; i++ {
+		z.repDistances[i] = 0
+	}
+
+	initProbPrices()
+	initCrcTable()
+	initGFastPos()
+
+	err = z.doEncode()
+	return
 }
 
-func newEncoderCompressionLevel(w io.Writer, size uint64, eos bool, cl compressionLevel) (io.WriteCloser, os.Error) {
-	if err := cl.checkValues(); err != nil {
-		return nil, err
-	}
-	cl.dictSize = 1 << cl.dictSize
-
+func newEncoderCompressionLevel(w io.Writer, size int64, level int) io.WriteCloser {
 	var z encoder
 	pr, pw := syncPipe()
 	go func() {
-		err := z.encoder(pr, w, size, eos, cl)
+		err := z.encoder(pr, w, size, level)
 		pr.CloseWithError(err)
 	}()
-	return pw, nil
+	return pw
 }
 
-func NewEncoderFileLevel(w io.Writer, size uint64, level int) (io.WriteCloser, os.Error) {
-	if level < 0 || level > 9 {
-		return nil, os.NewError("level out of range")
-	}
-	var eos bool = false  // end of stream
-	if size == /*-1*/ 1 { // TODO(eu): replace this magic number	// TODO(eu): why did i comment -1 ?
-		eos = true
-	}
-	if size == 0 || size < /*-1*/ 1 { // TODO(eu): decide if size can size be equal to zero
-		return nil, os.NewError("illegal size: " + string(size))
-	}
-	return newEncoderCompressionLevel(w, size, eos, levels[level])
+// This contructor shall be used when a custom level of compression is nedded
+// and the size of uncompressed data is known. Unlike gzip which stores the
+// size and the chechsum of uncompressed data at the end of the compressed file,
+// lzma stores this information at the begining. For this reason the caller must
+// pass the size of the file written to w, or choose a *Stream contructor which
+// uses -1 for the size and a marker of 6 bytes at the end of the stream.
+//
+func NewEncoderFileLevel(w io.Writer, size int64, level int) io.WriteCloser {
+	return newEncoderCompressionLevel(w, size, level)
 }
 
-func NewEncoderStreamLevel(w io.Writer, level int) (io.WriteCloser, os.Error) {
-	return NewEncoderFileLevel(w, /*-1*/ 1, level)
+// This contructor shall be used when a custom level of compression is nedded,
+// but the size of uncompressed data is unknown. Same as
+// NewEncoderFileLevel(w, -1, level).
+//
+func NewEncoderStreamLevel(w io.Writer, level int) io.WriteCloser {
+	return NewEncoderFileLevel(w, -1, level)
 }
 
-func NewEncoderFile(w io.Writer, size uint64) (io.WriteCloser, os.Error) {
-	if size <= 0 { // TODO(eu): decide if can size be equal to zero
-		return nil, os.NewError("illegal file size: " + string(size))
-	}
+// This contructor shall be used when size of uncompressed data in known. Same
+// as NewEncoderFileLevel(w, size, DefaultCompression).
+//
+func NewEncoderFile(w io.Writer, size int64) io.WriteCloser {
 	return NewEncoderFileLevel(w, size, DefaultCompression)
 }
 
-func NewEncoderStream(w io.Writer) (io.WriteCloser, os.Error) {
+// This contructor shall be used when the size of uncompressed data is unknown.
+// Reading the whole stream into memoty to find out it's size is not an option.
+// Same as NewEncoderFileLevel(w, -1, DefaultCompression).
+//
+func NewEncoderStream(w io.Writer) io.WriteCloser {
 	return NewEncoderStreamLevel(w, DefaultCompression)
 }
-// TODO: the api should be simpler; see if it's possible to get rid of size int

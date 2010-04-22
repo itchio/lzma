@@ -32,7 +32,6 @@ func newLzInWindow(r io.Reader, keepSizeBefore, keepSizeAfter, keepSizeReserv in
 		keepSizeAfter:  keepSizeAfter,
 		streamPos:      0,
 		streamEnd:      false,
-		// posLimit: initialized in readBlock()
 	}
 	err = iw.readBlock()
 	return

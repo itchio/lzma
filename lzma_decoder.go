@@ -30,10 +30,11 @@ const (
 // LZMA compressed file format
 // ---------------------------
 // Offset Size Description
-//   0     1   Special LZMA properties (lc,lp, pb in encoded form)
-//   1     4   Dictionary size (little endian)
-//   5     8   Uncompressed size (little endian). -1 means unknown size
-//  13         Compressed data
+//   0     1   		Special LZMA properties (lc,lp, pb in encoded form)
+//   1     4   		Dictionary size (little endian)
+//   5     8   		Uncompressed size (little endian). Size -1 means unknown size
+//  13     end    	Compressed data
+// end     end + 6	End Marker Bytes, only if size == -1
 
 // lzma pproperties
 type props struct {
@@ -41,7 +42,7 @@ type props struct {
 	dictSize   uint32
 }
 
-type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
+type decoder struct {
 	// input sources
 	rd *rangeDecoder
 	w  io.Writer
@@ -60,11 +61,11 @@ type decoder struct { // flate.inflater, zlib.reader, gzip.inflater
 	repG1Decoders    []uint16
 	repG2Decoders    []uint16
 	rep0LongDecoders []uint16
-	posSlotDecoders  []*rangeBitTreeCoder
+	posSlotCoders    []*rangeBitTreeCoder
 	posDecoders      []uint16
-	posAlignDecoder  *rangeBitTreeCoder
-	lenDecoder       *lenDecoder
-	repLenDecoder    *lenDecoder
+	posAlignCoder    *rangeBitTreeCoder
+	lenCoder         *lenCoder
+	repLenCoder      *lenCoder
 	litDecoder       *litDecoder
 	dictSizeCheck    uint32
 	posStateMask     uint32
@@ -145,7 +146,7 @@ func (z *decoder) doDecode() (err os.Error) {
 					rep0 = distance
 				}
 				if length == 0 {
-					res, err := z.repLenDecoder.decode(z.rd, posState)
+					res, err := z.repLenCoder.decode(z.rd, posState)
 					if err != nil {
 						return
 					}
@@ -156,13 +157,13 @@ func (z *decoder) doDecode() (err os.Error) {
 				rep3 = rep2
 				rep2 = rep1
 				rep1 = rep0
-				res, err := z.lenDecoder.decode(z.rd, posState)
+				res, err := z.lenCoder.decode(z.rd, posState)
 				if err != nil {
 					return
 				}
 				length = res + kMatchMinLen
 				state = stateUpdateMatch(state)
-				posSlot, err := z.posSlotDecoders[getLenToPosState(length)].decode(z.rd)
+				posSlot, err := z.posSlotCoders[getLenToPosState(length)].decode(z.rd)
 				if err != nil {
 					return
 				}
@@ -191,7 +192,7 @@ func (z *decoder) doDecode() (err os.Error) {
 						rep0 += int32(res << kNumAlignBits)
 						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [3]: posSlot = %d, numDirectBits = %d, " +
 						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
-						res, err = z.posAlignDecoder.reverseDecode(z.rd)
+						res, err = z.posAlignCoder.reverseDecode(z.rd)
 						if err != nil {
 							return
 						}
@@ -309,10 +310,10 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.litDecoder = newLitDecoder(uint32(z.prop.lp), uint32(z.prop.lc))
 
 	// z.lenDecoder
-	z.lenDecoder = newLenDecoder(uint32(1 << z.prop.pb))
+	z.lenCoder = newLenCoder(uint32(1 << z.prop.pb))
 
 	// z.repLenDecoder
-	z.repLenDecoder = newLenDecoder(uint32(1 << z.prop.pb))
+	z.repLenCoder = newLenCoder(uint32(1 << z.prop.pb))
 
 	// z.posStateMask
 	z.posStateMask = uint32(1<<z.prop.pb - 1)
@@ -339,18 +340,16 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.posDecoders = initBitModels(kNumFullDistances - kEndPosModelIndex)
 
 	// z.posSlotDecoders
-	z.posSlotDecoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
+	z.posSlotCoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
 	for i := 0; i < kNumLenToPosStates; i++ {
-		z.posSlotDecoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
+		z.posSlotCoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
 
 	// z.posAlignDecoder
-	z.posAlignDecoder = newRangeBitTreeCoder(kNumAlignBits)
+	z.posAlignCoder = newRangeBitTreeCoder(kNumAlignBits)
 
-	// start decoding data
-	if err = z.doDecode(); err != nil {
-		return
-	}
+	// decode data
+	err = z.doDecode()
 	return
 }
 
