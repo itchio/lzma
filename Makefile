@@ -8,7 +8,7 @@ GOFILES=\
 	lzma_base.go\
 	lzma_decoder.go\
 	lzma_encoder.go\
-	lzma_len_decoder.go\
+	lzma_len_coder.go\
 	lzma_lit_decoder.go\
 	range_bit_tree_coder.go\
 	range_decoder.go\
