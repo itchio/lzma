@@ -66,7 +66,7 @@ type decoder struct {
 	posAlignCoder    *rangeBitTreeCoder
 	lenCoder         *lenCoder
 	repLenCoder      *lenCoder
-	litDecoder       *litDecoder
+	litCoder         *litCoder
 	dictSizeCheck    uint32
 	posStateMask     uint32
 }
@@ -87,16 +87,16 @@ func (z *decoder) doDecode() (err os.Error) {
 			return
 		} else if res == 0 {
 			//fmt.Printf(" result from RD.Decoder.decodeBit(): res = %d\n", res)
-			ld2 := z.litDecoder.getDecoder(uint32(nowPos), prevByte)
+			lc2 := z.litCoder.getCoder(uint32(nowPos), prevByte)
 			if !stateIsCharState(state) {
 				//fmt.Printf("lzma.decoder.doDecode() before ld2.decodeWithMatchByte(): rep0 = %d\n", rep0)
-				res, err := ld2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
+				res, err := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
 				if err != nil {
 					return
 				}
 				prevByte = byte(res)
 			} else {
-				res, err := ld2.decodeNormal(z.rd)
+				res, err := lc2.decodeNormal(z.rd)
 				if err != nil {
 					return
 				}
@@ -307,7 +307,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	}
 
 	// z.litDecoder
-	z.litDecoder = newLitDecoder(uint32(z.prop.lp), uint32(z.prop.lc))
+	z.litCoder = newLitCoder(uint32(z.prop.lp), uint32(z.prop.lc))
 
 	// z.lenDecoder
 	z.lenCoder = newLenCoder(uint32(1 << z.prop.pb))
