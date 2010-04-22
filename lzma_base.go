@@ -19,15 +19,15 @@ const (
 	kNumLitContextBitsMax           = 8
 	kNumPosStatesBitsMax            = 4
 	kNumPosStatesMax                = 1 << kNumPosStatesBitsMax
-//	kNumPosStatesBitsEncodingMax    = 4
-//	kNumPosStatesEncodingMax        = 1 << kNumPosStatesBitsEncodingMax
-	kNumLowLenBits                  = 3
-	kNumMidLenBits                  = 3
-	kNumHighLenBits                 = 8
-	kNumLowLenSymbols               = 1 << kNumLowLenBits
-	kNumMidLenSymbols               = 1 << kNumMidLenBits
-	kNumLenSymbols                  = kNumLowLenSymbols + kNumMidLenSymbols + (1 << kNumHighLenBits)
-	kMatchMaxLen                    = kMatchMinLen + kNumLenSymbols - 1
+	//	kNumPosStatesBitsEncodingMax    = 4
+	//	kNumPosStatesEncodingMax        = 1 << kNumPosStatesBitsEncodingMax
+	kNumLowLenBits    = 3
+	kNumMidLenBits    = 3
+	kNumHighLenBits   = 8
+	kNumLowLenSymbols = 1 << kNumLowLenBits
+	kNumMidLenSymbols = 1 << kNumMidLenBits
+	kNumLenSymbols    = kNumLowLenSymbols + kNumMidLenSymbols + (1 << kNumHighLenBits)
+	kMatchMaxLen      = kMatchMinLen + kNumLenSymbols - 1
 )
 
 func stateUpdateChar(index uint32) uint32 {

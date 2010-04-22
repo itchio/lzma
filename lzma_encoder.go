@@ -96,6 +96,8 @@ const (
 	kIfinityPrice        int32 = 0xFFFFFFF
 	kDefaultDicLogSize   int32 = 22
 	kNumFastBytesDefault int32 = 0x20
+	kNumLenSpecSymbols   = kNumLowLenSymbols + kNumMidLenSymbols
+	kNumOpts             = 1 << 12
 )
 
 var gFastPos []byte = make([]byte, 1<<11)

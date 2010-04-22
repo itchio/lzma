@@ -121,3 +121,46 @@ func (lc *lenCoder) setPrices(prices []uint32, posState, numSymbols, st uint32) 
 		prices[st+i] = b1 + lc.highCoder.getPrice(i-kNumLowLenSymbols-kNumMidLenSymbols)
 	}
 }
+
+// ---------------- end encode --------------------
+
+
+type lenPriceTableCoder struct {
+	lc        *lenCoder
+	prices    []uint32
+	counters  []uint32
+	tableSize uint32
+}
+
+func newLenPriceTableCoder(tableSize, numPosStates uint32) *lenPriceTableCoder {
+	pc := &lenPriceTableCoder{
+		lc:        newLenCoder(numPosStates),
+		prices:    make([]uint32, kNumLenSymbols<<kNumPosStatesBitsMax),
+		counters:  make([]uint32, kNumPosStatesMax),
+		tableSize: tableSize,
+	}
+	for posState := uint32(0); posState < numPosStates; posState++ {
+		pc.updateTable(posState)
+	}
+	return pc
+}
+
+func (pc *lenPriceTableCoder) updateTable(posState uint32) {
+	pc.lc.setPrices(pc.prices, posState, pc.tableSize, posState*kNumLenSymbols)
+	pc.counters[posState] = pc.tableSize
+}
+
+func (pc *lenPriceTableCoder) getPrice(symbol, posState uint32) uint32 {
+	return pc.prices[posState*kNumLenSymbols+symbol]
+}
+
+func (pc *lenPriceTableCoder) encode(re *rangeEncoder, symbol, posState uint32) (err os.Error) {
+	err = pc.lc.encode(re, symbol, posState)
+	if err != nil {
+		return
+	}
+	if pc.counters[posState]-1 == 0 {
+		pc.updateTable(posState)
+	}
+	return
+}
