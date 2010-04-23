@@ -2,16 +2,12 @@ include $(GOROOT)/src/Make.$(GOARCH)
 
 TARG=compress/lzma
 GOFILES=\
-	lz_bin_tree.go\
-	lz_in_window.go\
-	lz_out_window.go\
-	lzma_base.go\
+	lz_win.go\
 	lzma_decoder.go\
 	lzma_encoder.go\
-	lzma_len_coder.go\
-	lzma_lit_decoder.go\
+	len_coder.go\
+	lit_coder.go\
 	range_bit_tree_coder.go\
-	range_decoder.go\
-	range_encoder.go\
+	range_coder.go\
 
 include $(GOROOT)/src/Make.pkg

@@ -16,7 +16,6 @@ package lzma
 import (
 	"io"
 	"os"
-	//"fmt"
 )
 
 const (
@@ -25,34 +24,124 @@ const (
 	lzmaPropSize        = 5
 	lzmaHeaderSize      = lzmaPropSize + 8
 	lzmaMaxReqInputSize = 20
+
+	kNumRepDistances                = 4
+	kNumStates                      = 12
+	kNumPosSlotBits                 = 6
+	kDicLogSizeMin                  = 0
+	kNumLenToPosStatesBits          = 2
+	kNumLenToPosStates              = 1 << kNumLenToPosStatesBits
+	kMatchMinLen                    = 2
+	kNumAlignBits                   = 4
+	kAlignTableSize                 = 1 << kNumAlignBits
+	kAlignMask                      = kAlignTableSize - 1
+	kStartPosModelIndex             = 4
+	kEndPosModelIndex               = 14
+	kNumPosModels                   = kEndPosModelIndex - kStartPosModelIndex
+	kNumFullDistances               = 1 << (kEndPosModelIndex / 2)
+	kNumLitPosStatesBitsEncodingMax = 4
+	kNumLitContextBitsMax           = 8
+	kNumPosStatesBitsMax            = 4
+	kNumPosStatesMax                = 1 << kNumPosStatesBitsMax
+	kNumLowLenBits                  = 3
+	kNumMidLenBits                  = 3
+	kNumHighLenBits                 = 8
+	kNumLowLenSymbols               = 1 << kNumLowLenBits
+	kNumMidLenSymbols               = 1 << kNumMidLenBits
+	kNumLenSymbols                  = kNumLowLenSymbols + kNumMidLenSymbols + (1 << kNumHighLenBits)
+	kMatchMaxLen                    = kMatchMinLen + kNumLenSymbols - 1
 )
+
+func stateUpdateChar(index uint32) uint32 {
+	if index < 4 {
+		return 0
+	}
+	if index < 10 {
+		return index - 3
+	}
+	return index - 6
+}
+
+func stateUpdateMatch(index uint32) uint32 {
+	if index < 7 {
+		return 7
+	}
+	return 10
+}
+
+func stateUpdateRep(index uint32) uint32 {
+	if index < 7 {
+		return 8
+	}
+	return 11
+}
+
+func stateUpdateShortRep(index uint32) uint32 {
+	if index < 7 {
+		return 9
+	}
+	return 11
+}
+
+func stateIsCharState(index uint32) bool {
+	if index < 7 {
+		return true
+	}
+	return false
+}
+
+func getLenToPosState(length uint32) uint32 {
+	length -= kMatchMinLen
+	if length < kNumLenToPosStates {
+		return length
+	}
+	return kNumLenToPosStates - 1
+}
+
 
 // LZMA compressed file format
 // ---------------------------
-// Offset Size Description
+// Offset Size 	      Description
 //   0     1   		Special LZMA properties (lc,lp, pb in encoded form)
 //   1     4   		Dictionary size (little endian)
 //   5     8   		Uncompressed size (little endian). Size -1 means unknown size
-//  13     end    	Compressed data
-// end     end + 6	End Marker Bytes, only if size == -1
+//  13     5		range coder's code field
+// end-6   6		End Marker Bytes, only if size == -1
 
-// lzma pproperties
+
+// lzma properties
 type props struct {
 	lc, lp, pb uint8
 	dictSize   uint32
 }
 
+func (p *props) decodeProps(buf []byte) (err os.Error) {
+	d := buf[0]
+	if d > (9 * 5 * 5) {
+		return os.NewError("illegal value of encoded lc, lp, pb byte " + string(d))
+	}
+	p.lc = d % 9
+	d /= 9
+	p.pb = d / 5
+	p.lp = d % 5
+	if p.lc > kNumLitContextBitsMax || p.lp > 4 || p.pb > kNumPosStatesBitsMax {
+		return os.NewError("illegal values of lc, lp or pb: " + string(p.lc) + ", " + string(p.lp) + ", " + string(p.pb))
+	}
+	for i := 0; i < 4; i++ {
+		p.dictSize += uint32(buf[i+1]&0xff) << uint32(i*8)
+	}
+	return
+}
+
+
 type decoder struct {
-	// input sources
-	rd *rangeDecoder
-	w  io.Writer
+	// i/o
+	rd     *rangeDecoder // r
+	outWin *lzOutWindow  // w
 
 	// lzma header
 	prop       *props
 	unpackSize int64
-
-	// hz
-	outWin *lzOutWindow
 
 	// hz
 	matchDecoders    []uint16
@@ -81,15 +170,12 @@ func (z *decoder) doDecode() (err os.Error) {
 	var prevByte byte = 0
 
 	for z.unpackSize < 0 || nowPos < z.unpackSize {
-		//fmt.Printf("lzma.decoder.doDecode(), beggining of main loop: nowPos = %d, unpackSize = %d\n", nowPos, z.unpackSize)
 		posState := uint32(nowPos) & z.posStateMask
 		if res, err := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState); err != nil {
 			return
 		} else if res == 0 {
-			//fmt.Printf(" result from RD.Decoder.decodeBit(): res = %d\n", res)
 			lc2 := z.litCoder.getCoder(uint32(nowPos), prevByte)
 			if !stateIsCharState(state) {
-				//fmt.Printf("lzma.decoder.doDecode() before ld2.decodeWithMatchByte(): rep0 = %d\n", rep0)
 				res, err := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
 				if err != nil {
 					return
@@ -101,7 +187,6 @@ func (z *decoder) doDecode() (err os.Error) {
 					return
 				}
 				prevByte = byte(res)
-				//fmt.Printf("litDecoder.decodeNormal(): res = %d\n", prevByte)
 			}
 			err := z.outWin.putByte(prevByte)
 			if err != nil {
@@ -110,7 +195,6 @@ func (z *decoder) doDecode() (err os.Error) {
 			state = stateUpdateChar(state)
 			nowPos++
 		} else {
-			//fmt.Printf(" result from RD.Decoder.decodeBit(): res = %d\n", res)
 			var length uint32
 			if res, err := z.rd.decodeBit(z.repDecoders, state); err != nil {
 				return
@@ -170,40 +254,25 @@ func (z *decoder) doDecode() (err os.Error) {
 				if posSlot >= kStartPosModelIndex {
 					numDirectBits := uint32(posSlot>>1 - 1)
 					rep0 = int32((2 | posSlot&1) << numDirectBits)
-					//fmt.Printf("lzma.decoder.doDecode(), inside of main loop: posSlot = %d, numDirectBits = %d, " +
-					//			"rep0 = %d\n", posSlot, numDirectBits, rep0)
 					if posSlot < kEndPosModelIndex {
 						res, err := reverseDecodeIndex(z.rd, z.posDecoders, rep0-int32(posSlot)-1, numDirectBits)
 						if err != nil {
 							return
 						}
 						rep0 += int32(res)
-						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [0]: posSlot = %d, numDirectBits = %d, " +
-						//		"rep0 = %d\n", posSlot, numDirectBits, rep0)
 					} else {
-						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [1]: posSlot = %d, numDirectBits = %d, " +
-						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
 						res, err := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)
 						if err != nil {
 							return
 						}
-						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [2]: posSlot = %d, numDirectBits = %d, " +
-						//                "rep0 = %d, res = %d\n", posSlot, numDirectBits, rep0, res)
 						rep0 += int32(res << kNumAlignBits)
-						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [3]: posSlot = %d, numDirectBits = %d, " +
-						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
 						res, err = z.posAlignCoder.reverseDecode(z.rd)
 						if err != nil {
 							return
 						}
-						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [4]: posSlot = %d, numDirectBits = %d, " +
-						//                "rep0 = %d, res = %d\n", posSlot, numDirectBits, rep0, res)
 						rep0 += int32(res)
-						//fmt.Printf("lzma.decoder.doDecode(), inside of main loop [5]: posSlot = %d, numDirectBits = %d, " +
-						//                "rep0 = %d\n", posSlot, numDirectBits, rep0)
 						if rep0 < 0 {
 							if rep0 == -1 {
-								//fmt.Printf("lzma.decoder.doDecode() rep0 == -1, break here\n")
 								break
 							}
 							return os.NewError("error in data stream (checkpoint 1)")
@@ -213,7 +282,6 @@ func (z *decoder) doDecode() (err os.Error) {
 					rep0 = int32(posSlot)
 				}
 			}
-			//fmt.Printf("lzma.decoder.doDecode(): rep0 = %d, nowPos = %d, z.dictSizeCheck = %d\n", rep0, nowPos, z.dictSizeCheck)
 			if int64(rep0) >= nowPos || rep0 >= int32(z.dictSizeCheck) {
 				return os.NewError("error in data stream (checkpoint 2)")
 			}
@@ -230,38 +298,8 @@ func (z *decoder) doDecode() (err os.Error) {
 	return nil
 }
 
-func (z *decoder) decodeProps(buf []byte) (err os.Error) {
-	d := buf[0]
-	if d > (9 * 5 * 5) {
-		return os.NewError("illegal value of encoded lc, lp, pb byte " + string(d))
-	}
-	z.prop.lc = d % 9
-	d /= 9
-	z.prop.pb = d / 5
-	z.prop.lp = d % 5
-	if z.prop.lc > kNumLitContextBitsMax || z.prop.lp > 4 || z.prop.pb > kNumPosStatesBitsMax {
-		return os.NewError("illegal values of lc, lp or pb: " + string(z.prop.lc) + ", " + string(z.prop.lp) + ", " + string(z.prop.pb))
-	}
-	//z.prop.dictSize = uint32(buf[1]) | uint32(buf[2]<<8) | uint32(buf[3]<<16) | uint32(buf[4]<<24)
-	for i := 0; i < 4; i++ {
-		z.prop.dictSize += uint32(buf[i+1]&0xff) << uint32(i*8)
-	}
-	//fmt.Printf("lzma.decoder.decodeProps(): z.prop.dictSize = %d, z.prop.lc = %d, z.prop.lp = %d, z.prop.pb = %d\n", z.prop.dictSize, z.prop.lc, z.prop.lp, z.prop.pb)
-	return
-}
-
-// decoder initializes a decoder; it reads first 13 bytes from r which contain
-// lc, lp, pb, dictSize and unpackedSize; next creates a rangeDecoder; the
-// rangeDecoder should be created after lzmaHeader is read from r because
-// newRangeDecoder() further reads from the same stream 5 bytes to
-// init rangeDecoder.code
 func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
-	// init z
-
-	// z.w
-	z.w = w
-
-	// z.prop
+	// read first 13 bytes from r which contain lc, lp, pb, dictSize and unpackedSize
 	header := make([]byte, lzmaHeaderSize)
 	n, err := r.Read(header)
 	if err != nil {
@@ -271,11 +309,10 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 		return os.NewError("read " + string(n) + " bytes instead of " + string(lzmaHeaderSize))
 	}
 	z.prop = &props{}
-	if err = z.decodeProps(header); err != nil {
+	if err = z.prop.decodeProps(header); err != nil {
 		return
 	}
 
-	// z.unpackSize
 	z.unpackSize = 0
 	for i := 0; i < 8; i++ {
 		b := header[lzmaPropSize+i]
@@ -284,71 +321,40 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 		}
 		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
 	}
-	//fmt.Printf("lzma.decoder.decoder(): z.unpackSize = %d\n", z.unpackSize)
 
-	// z.rd	// do not move before z.prop
+	// do not move the initialization of z.rd before that of z.prop and z.unpackSize
 	z.rd, err = newRangeDecoder(r)
 	if err != nil {
 		return
 	}
 
-	// z.dictSizeCheck
 	if z.prop.dictSize >= 1 {
 		z.dictSizeCheck = z.prop.dictSize
 	} else {
 		z.dictSizeCheck = 1
 	}
-
-	// z.outWin
 	if z.dictSizeCheck >= 1<<12 {
-		z.outWin = newLzOutWindow(z.w, z.dictSizeCheck) // z.w ?
+		z.outWin = newLzOutWindow(w, z.dictSizeCheck)
 	} else {
-		z.outWin = newLzOutWindow(z.w, 1<<12) // z.w ?
+		z.outWin = newLzOutWindow(w, 1<<12)
 	}
-
-	// z.litDecoder
 	z.litCoder = newLitCoder(uint32(z.prop.lp), uint32(z.prop.lc))
-
-	// z.lenDecoder
 	z.lenCoder = newLenCoder(uint32(1 << z.prop.pb))
-
-	// z.repLenDecoder
 	z.repLenCoder = newLenCoder(uint32(1 << z.prop.pb))
-
-	// z.posStateMask
 	z.posStateMask = uint32(1<<z.prop.pb - 1)
-
-	// z.matchDecoders
 	z.matchDecoders = initBitModels(kNumStates << kNumPosStatesBitsMax)
-
-	// z.repDecoders
 	z.repDecoders = initBitModels(kNumStates)
-
-	// z.repG0Decoders
 	z.repG0Decoders = initBitModels(kNumStates)
-
-	// z.rep10Decoders
 	z.repG1Decoders = initBitModels(kNumStates)
-
-	// z.repG2Decoders
 	z.repG2Decoders = initBitModels(kNumStates)
-
-	// z.rep0LongDecoders
 	z.rep0LongDecoders = initBitModels(kNumStates << kNumPosStatesBitsMax)
-
-	// z.posDecoders
 	z.posDecoders = initBitModels(kNumFullDistances - kEndPosModelIndex)
-
-	// z.posSlotDecoders
 	z.posSlotCoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
 	for i := 0; i < kNumLenToPosStates; i++ {
 		z.posSlotCoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
-
-	// z.posAlignDecoder
 	z.posAlignCoder = newRangeBitTreeCoder(kNumAlignBits)
 
-	// decode data
 	err = z.doDecode()
 	return
 }
