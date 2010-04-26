@@ -91,18 +91,18 @@ func (outWin *lzOutWindow) getByte(distance uint32) (b byte) {
 type lzInWindow struct {
 	r              io.Reader
 	buf            []byte
-	posLimit       int32
-	lastSafePos    int32
-	bufOffset      int32
-	blockSize      int32
-	pos            int32
-	keepSizeBefore int32
-	keepSizeAfter  int32
-	streamPos      int32
+	posLimit       uint32
+	lastSafePos    uint32
+	bufOffset      uint32
+	blockSize      uint32
+	pos            uint32
+	keepSizeBefore uint32
+	keepSizeAfter  uint32
+	streamPos      uint32
 	streamEnd      bool
 }
 
-func newLzInWindow(r io.Reader, keepSizeBefore, keepSizeAfter, keepSizeReserv int32) (iw *lzInWindow, err os.Error) {
+func newLzInWindow(r io.Reader, keepSizeBefore, keepSizeAfter, keepSizeReserv uint32) (iw *lzInWindow, err os.Error) {
 	blockSize := keepSizeBefore + keepSizeAfter + keepSizeReserv
 	iw = &lzInWindow{
 		r:              r,
@@ -126,7 +126,7 @@ func (iw *lzInWindow) moveBlock() {
 		offset--
 	}
 	numBytes := iw.bufOffset + iw.streamPos - offset
-	for i := int32(0); i < numBytes; i++ {
+	for i := uint32(0); i < numBytes; i++ {
 		iw.buf[i] = iw.buf[offset+i]
 	}
 	iw.bufOffset -= offset
@@ -153,7 +153,7 @@ func (iw *lzInWindow) readBlock() (err os.Error) {
 			iw.streamEnd = true
 			return
 		}
-		iw.streamPos += int32(n)
+		iw.streamPos += uint32(n)
 		if iw.streamPos >= (iw.pos + iw.keepSizeAfter) {
 			iw.posLimit = iw.streamPos - iw.keepSizeAfter
 		}
@@ -176,32 +176,38 @@ func (iw *lzInWindow) movePos() (err os.Error) {
 	return
 }
 
-func (iw *lzInWindow) indexByte(index int32) byte {
-	return iw.buf[iw.bufOffset+iw.pos+index]
+// signature: c | go | cs (index is a signed int)
+func (iw *lzInWindow) getIndexByte(index int32) byte {
+	return iw.buf[int32(iw.bufOffset+iw.pos)+index]
 }
 
-func (iw *lzInWindow) matchLen(index, distance, limit int32) (res int32) {
+// only index should be signed
+func (iw *lzInWindow) getMatchLen(index int32, distance, limit uint32) (res uint32) {
 	if iw.streamEnd == true {
-		if iw.pos+index+limit > iw.streamPos {
-			limit = iw.streamPos - iw.pos - index
+		if uint32(int32(iw.pos)+index)+limit > iw.streamPos {
+			limit = iw.streamPos - uint32(int32(iw.pos)+index)
 		}
 	}
 	distance++
-	pby := iw.bufOffset + iw.pos + index
-	for res = int32(0); res < limit && iw.buf[pby+res] == iw.buf[pby+res-distance]; res++ {
+	pby := iw.bufOffset + iw.pos + uint32(index)
+	for res = uint32(0); res < limit && iw.buf[pby+res] == iw.buf[pby+res-distance]; res++ {
+		// empty body
 	}
 	return
 }
 
-func (iw *lzInWindow) availableBytes() int32 {
+// signature: c | go | cs
+func (iw *lzInWindow) getNumAvailableBytes() uint32 {
 	return iw.streamPos - iw.pos
 }
 
+// signature: c | go | cs (signed)
 func (iw *lzInWindow) reduceOffsets(subValue int32) {
-	iw.bufOffset += subValue
-	iw.posLimit -= subValue
-	iw.pos -= subValue
-	iw.streamPos -= subValue
+	uSubValue := uint32(subValue)
+	iw.bufOffset += uSubValue
+	iw.posLimit -= uSubValue
+	iw.pos -= uSubValue
+	iw.streamPos -= uSubValue
 }
 
 
@@ -209,34 +215,36 @@ func (iw *lzInWindow) reduceOffsets(subValue int32) {
 
 
 const (
-	kHash2Size          int32 = 1 << 10
-	kHash3Size          int32 = 1 << 16
-	kBT2HashSize        int32 = 1 << 16
-	kStartMaxLen        int32 = 1
-	kHash3Offset        int32 = kHash2Size
-	kEmptyHashValue     int32 = 0
-	kMaxValForNormalize int32 = (1 << 30) - 1
+	kHash2Size          = 1 << 10
+	kHash3Size          = 1 << 16
+	kBT2HashSize        = 1 << 16
+	kStartMaxLen        = 1
+	kHash3Offset        = kHash2Size
+	kEmptyHashValue     = 0
+	kMaxValForNormalize = (1 << 30) - 1
 )
 
+// all should be unsigned
 type lzBinTree struct {
 	iw                   *lzInWindow
-	son                  []int32
-	hash                 []int32
-	cyclicBufPos         int32
-	cyclicBufSize        int32
-	matchMaxLen          int32
-	cutValue             int32
-	hashMask             int32
-	hashSizeSum          int32
-	kvNumHashDirectBytes int32
-	kvMinMatchCheck      int32
-	kvFixHashSize        int32
+	son                  []uint32
+	hash                 []uint32
+	cyclicBufPos         uint32
+	cyclicBufSize        uint32
+	matchMaxLen          uint32
+	cutValue             uint32
+	hashMask             uint32
+	hashSizeSum          uint32
+	kvNumHashDirectBytes uint32
+	kvMinMatchCheck      uint32
+	kvFixHashSize        uint32
 	hashArray            bool
 }
 
-func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes int32) (bt *lzBinTree, err os.Error) {
+// signature: c | go | cs (in cs compressionLevel fields are signed, but for no good reason)
+func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes uint32) (bt *lzBinTree, err os.Error) {
 	bt = &lzBinTree{
-		son:           make([]int32, (historySize+1)*2),
+		son:           make([]uint32, (historySize+1)*2),
 		cyclicBufPos:  0,
 		cyclicBufSize: historySize + 1,
 		matchMaxLen:   matchMaxLen,
@@ -261,7 +269,7 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 		bt.kvFixHashSize = 0
 	}
 
-	hs := kBT2HashSize
+	hs := uint32(kBT2HashSize)
 	if bt.hashArray == true {
 		hs = historySize - 1
 		hs |= hs >> 1
@@ -278,8 +286,8 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 		hs += bt.kvFixHashSize
 	}
 	bt.hashSizeSum = hs
-	bt.hash = make([]int32, bt.hashSizeSum)
-	for i := int32(0); i < bt.hashSizeSum; i++ {
+	bt.hash = make([]uint32, bt.hashSizeSum)
+	for i := uint32(0); i < bt.hashSizeSum; i++ {
 		bt.hash[i] = kEmptyHashValue
 	}
 
@@ -287,8 +295,8 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 	return
 }
 
-func normalizeLinks(items []int32, numItems, subValue int32) {
-	for i := int32(0); i < numItems; i++ {
+func normalizeLinks(items []uint32, numItems, subValue uint32) {
+	for i := uint32(0); i < numItems; i++ {
 		value := items[i]
 		if value <= subValue {
 			value = kEmptyHashValue
@@ -303,7 +311,7 @@ func (bt *lzBinTree) normalize() {
 	subValue := bt.iw.pos - bt.cyclicBufSize
 	normalizeLinks(bt.son, bt.cyclicBufSize*2, subValue)
 	normalizeLinks(bt.hash, bt.hashSizeSum, subValue)
-	bt.iw.reduceOffsets(subValue)
+	bt.iw.reduceOffsets(int32(subValue))
 }
 
 func (bt *lzBinTree) movePos() (err os.Error) {
@@ -321,8 +329,8 @@ func (bt *lzBinTree) movePos() (err os.Error) {
 	return
 }
 
-func (bt *lzBinTree) getMatches(distances []int32) (res int32, err os.Error) {
-	var lenLimit int32
+func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
+	var lenLimit uint32
 	if bt.iw.pos+bt.matchMaxLen <= bt.iw.streamPos {
 		lenLimit = bt.matchMaxLen
 	} else {
@@ -336,25 +344,25 @@ func (bt *lzBinTree) getMatches(distances []int32) (res int32, err os.Error) {
 		}
 	}
 
-	offset := int32(0)
-	matchMinPos := int32(0)
+	offset := uint32(0)
+	matchMinPos := uint32(0)
 	if bt.iw.pos > bt.cyclicBufSize {
 		matchMinPos = bt.iw.pos - bt.cyclicBufSize
 	}
 	cur := bt.iw.bufOffset + bt.iw.pos
-	maxLen := kStartMaxLen
-	var hashValue int32
-	hash2Value := int32(0)
-	hash3Value := int32(0)
+	maxLen := uint32(kStartMaxLen)
+	var hashValue uint32
+	hash2Value := uint32(0)
+	hash3Value := uint32(0)
 
 	if bt.hashArray == true {
-		tmp := crcTable[bt.iw.buf[cur]&0xFF] ^ int32(int8(bt.iw.buf[cur+1]&0xFF))
+		tmp := crcTable[bt.iw.buf[cur]&0xFF] ^ uint32(bt.iw.buf[cur+1]&0xFF)
 		hash2Value = tmp & (kHash2Size - 1)
-		tmp ^= int32(int8(bt.iw.buf[cur+2]&0xFF)) << 8
+		tmp ^= uint32(bt.iw.buf[cur+2]&0xFF) << 8
 		hash3Value = tmp & (kHash3Size - 1)
 		hashValue = (tmp ^ crcTable[bt.iw.buf[cur+3]&0xFF]<<5) & bt.hashMask
 	} else {
-		hashValue = int32(int8(bt.iw.buf[cur]&0xFF)) ^ int32(int8(bt.iw.buf[cur+1]&0xFF))<<8
+		hashValue = uint32(bt.iw.buf[cur]&0xFF) ^ uint32(bt.iw.buf[cur+1]&0xFF)<<8
 	}
 
 	curMatch := bt.hash[bt.kvFixHashSize+hashValue]
@@ -420,14 +428,14 @@ func (bt *lzBinTree) getMatches(distances []int32) (res int32, err os.Error) {
 		count--
 
 		delta := bt.iw.pos - curMatch
-		var cyclicPos int32
+		var cyclicPos uint32
 		if delta <= bt.cyclicBufPos {
 			cyclicPos = (bt.cyclicBufPos - delta) << 1
 		} else {
 			cyclicPos = (bt.cyclicBufPos - delta + bt.cyclicBufSize) << 1
 		}
 		pby1 := bt.iw.bufOffset + curMatch
-		var length int32
+		var length uint32
 		if len0 <= len1 {
 			length = len0
 		} else {
@@ -471,9 +479,9 @@ func (bt *lzBinTree) getMatches(distances []int32) (res int32, err os.Error) {
 	return offset, err
 }
 
-func (bt *lzBinTree) skip(num int32) (err os.Error) {
-	for i := int32(0); i < num; i++ {
-		var lenLimit int32
+func (bt *lzBinTree) skip(num uint32) (err os.Error) {
+	for i := uint32(0); i < num; i++ {
+		var lenLimit uint32
 		if bt.iw.pos+bt.matchMaxLen <= bt.iw.streamPos {
 			lenLimit = bt.matchMaxLen
 		} else {
@@ -487,22 +495,22 @@ func (bt *lzBinTree) skip(num int32) (err os.Error) {
 			}
 		}
 
-		matchMinPos := int32(0)
+		matchMinPos := uint32(0)
 		if bt.iw.pos > bt.cyclicBufSize {
 			matchMinPos = bt.iw.pos - bt.cyclicBufSize
 		}
 		cur := bt.iw.bufOffset + bt.iw.pos
-		var hashValue int32
+		var hashValue uint32
 		if bt.hashArray == true {
-			tmp := crcTable[bt.iw.buf[cur]&0xFF] ^ int32(int8(bt.iw.buf[cur+1]&0xFF))
+			tmp := crcTable[bt.iw.buf[cur]&0xFF] ^ uint32(bt.iw.buf[cur+1]&0xFF)
 			hash2Value := tmp & (kHash2Size - 1)
 			bt.hash[hash2Value] = bt.iw.pos
-			tmp ^= int32(int8(bt.iw.buf[cur+2]&0xFF)) << 8
+			tmp ^= uint32(bt.iw.buf[cur+2]&0xFF) << 8
 			hash3Value := tmp & (kHash3Size - 1)
 			bt.hash[kHash3Offset+hash3Value] = bt.iw.pos
 			hashValue = (tmp ^ crcTable[bt.iw.buf[cur+3]&0xFF]<<5) & bt.hashMask
 		} else {
-			hashValue = int32(int8(bt.iw.buf[cur]&0xFF)) ^ int32(int8(bt.iw.buf[cur+1]&0xFF))<<8
+			hashValue = uint32(bt.iw.buf[cur]&0xFF) ^ uint32(bt.iw.buf[cur+1]&0xFF)<<8
 		}
 
 		curMatch := bt.hash[bt.kvFixHashSize+hashValue]
@@ -521,14 +529,14 @@ func (bt *lzBinTree) skip(num int32) (err os.Error) {
 			count--
 
 			delta := bt.iw.pos - curMatch
-			var cyclicPos int32
+			var cyclicPos uint32
 			if delta <= bt.cyclicBufPos {
 				cyclicPos = (bt.cyclicBufPos - delta) << 1
 			} else {
 				cyclicPos = (bt.cyclicBufPos - delta + bt.cyclicBufSize) << 1
 			}
 			pby1 := bt.iw.bufOffset + curMatch
-			var length int32
+			var length uint32
 			if len0 <= len1 {
 				length = len0
 			} else {
@@ -569,17 +577,17 @@ func (bt *lzBinTree) skip(num int32) (err os.Error) {
 }
 
 
-var crcTable []int32 = make([]int32, 256)
+var crcTable []uint32 = make([]uint32, 256)
 
 // should be called in the encoder's contructor
 func initCrcTable() {
-	for i := int32(0); i < 256; i++ {
+	for i := uint32(0); i < 256; i++ {
 		r := i
 		for j := 0; j < 8; j++ {
 			if r&i != 0 {
-				r = int32(uint32(r)>>1 ^ 0xEDB88320)
+				r = r>>1 ^ 0xEDB88320
 			} else {
-				r = int32(uint32(r) >> 1)
+				r = r >> 1
 			}
 		}
 		crcTable[i] = r

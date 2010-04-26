@@ -229,6 +229,7 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 }
 
 
+// i believe the values are less than max(uint16), just like in the functions below
 var probPrices []uint32 = make([]uint32, kBitModelTotal>>kNumMoveReducingBits) // len is currently 512
 
 // should be called in the encoder's contructor.

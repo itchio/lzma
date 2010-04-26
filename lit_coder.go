@@ -2,8 +2,6 @@ package lzma
 
 import "os"
 
-//-------------------------- litCoder2 ----------------------------------
-
 type litCoder2 struct {
 	coders []uint16
 }
@@ -14,7 +12,6 @@ func newLitCoder2() *litCoder2 {
 	}
 }
 
-//------------------------ litCoder2 --- decode -------------------------
 
 func (lc2 *litCoder2) decodeNormal(rd *rangeDecoder) (b byte, err os.Error) {
 	symbol := uint32(1)
@@ -52,7 +49,6 @@ func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) (b b
 	return byte(symbol), nil
 }
 
-//------------------------- litCoder2 --- encode ------------------------
 
 func (lc2 *litCoder2) encode(re *rangeEncoder, symbol byte) (err os.Error) {
 	context := uint32(1)
@@ -138,6 +134,7 @@ func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
 	return lc
 }
 
+// TODO: 1. rename getCoder to getSubCoder os subCoder; 2. rename litCoder2 to litSubCoder
 func (lc *litCoder) getCoder(pos uint32, prevByte byte) *litCoder2 {
 	return lc.coders[((pos&lc.posMask)<<lc.numPrevBits)+uint32((prevByte&0xff)>>(8-lc.numPrevBits))]
 }

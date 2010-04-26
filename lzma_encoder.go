@@ -45,14 +45,14 @@ func syncPipe() (*syncPipeReader, *syncPipeWriter) {
 
 
 type compressionLevel struct {
-	//compressionMode    uint32 // compression mode // a
-	dictSize  uint32 // dictionary size, computed as (1 << d) // d
-	fastBytes uint32 // number of fast bytes // fb
-	//matchCycles        uint32 // number of cycles for match finder // mc
-	litContextBits uint32 // number of literal context bits // lc
-	litPosBits     uint32 // number of literal pos bits // lp
-	posBits        uint32 // number of pos bits // pb
-	matchFinder    string // match finder // mf
+	dictSize        uint32 // d, 1 << dictSize
+	fastBytes       uint32 // fb
+	litContextBits  uint32 // lc
+	litPosStateBits uint32 // lp
+	posStateBits    uint32 // pb
+	matchFinder     string // mf
+	//compressionMode uint32 // a
+	//matchCycles     uint32 // mc
 }
 
 var levels = []*compressionLevel{
@@ -68,9 +68,7 @@ var levels = []*compressionLevel{
 }
 
 func (cl *compressionLevel) checkValues() os.Error {
-	// max 1 << 29 bytes in Java version
-	// max 1 << 30 bytes ANSI C and CPP versions
-	if cl.dictSize < 12 || cl.dictSize > 30 {
+	if cl.dictSize < 0 || cl.dictSize > 29 {
 		return os.NewError("dictionary size out of range: " + string(cl.dictSize))
 	}
 	if cl.fastBytes < 5 || cl.fastBytes > 273 {
@@ -79,11 +77,11 @@ func (cl *compressionLevel) checkValues() os.Error {
 	if cl.litContextBits < 0 || cl.litContextBits > 8 {
 		return os.NewError("number of literal context bits out of range: " + string(cl.litContextBits))
 	}
-	if cl.litPosBits < 0 || cl.litPosBits > 4 {
-		return os.NewError("number of literal position bits out of range: " + string(cl.litPosBits))
+	if cl.litPosStateBits < 0 || cl.litPosStateBits > 4 {
+		return os.NewError("number of literal position bits out of range: " + string(cl.litPosStateBits))
 	}
-	if cl.posBits < 0 || cl.posBits > 4 {
-		return os.NewError("number of position bits out of range: " + string(cl.posBits))
+	if cl.posStateBits < 0 || cl.posStateBits > 4 {
+		return os.NewError("number of position bits out of range: " + string(cl.posStateBits))
 	}
 	if cl.matchFinder != "bt2" || cl.matchFinder != "bt4" { // there are also bt3 and hc4, but will implement them later
 		return os.NewError("unsuported match finder: " + cl.matchFinder)
@@ -139,14 +137,14 @@ type optimal struct {
 	backs0,
 	backs1,
 	backs2,
-	backs3 int32
+	backs3 uint32
 
 	prev1IsChar,
 	prev2 bool
 }
 
 func (o *optimal) makeAsChar() {
-	o.backPrev = -1
+	o.backPrev = 0xFFFFFFFF
 	o.prev1IsChar = false
 }
 
@@ -164,71 +162,179 @@ func (o *optimal) isShortRep() bool {
 
 
 const (
-	eMatchFinderTypeBT2  uint32 = 0
-	eMatchFinderTypeBT4  uint32 = 1
-	kIfinityPrice        int32  = 0xFFFFFFF
-	kDefaultDicLogSize   int32  = 22
-	kNumFastBytesDefault int32  = 0x20
+	eMatchFinderTypeBT2  = 0
+	eMatchFinderTypeBT4  = 1
+	kIfinityPrice        = 0xFFFFFFF
+	kDefaultDicLogSize   = 22
+	kNumFastBytesDefault = 0x20
 	kNumLenSpecSymbols   = kNumLowLenSymbols + kNumMidLenSymbols
 	kNumOpts             = 1 << 12
 )
 
 type encoder struct {
-	// i/o
-	re          *rangeEncoder // w
-	matchFinder *lzBinTree    // r
+	// i/o, range encoder and match finder
+	re *rangeEncoder // w
+	mf *lzBinTree    // r
 
 	cl           *compressionLevel
 	size         int64
 	writeEndMark bool // eos
 
-	optimum             []*optimal
-	isMatch             []uint16
-	isRep               []uint16
-	isRepG0             []uint16
-	isRepG1             []uint16
-	isRepG2             []uint16
-	isRep0Long          []uint16
-	posSlotCoders       []*rangeBitTreeCoder
-	posEncoders         []uint16
-	posAlignCoder       *rangeBitTreeCoder
-	lenCoder            *lenPriceTableCoder
-	repLenCoder         *lenPriceTableCoder
-	litCoder            *litCoder
-	matchDistances      []uint32
-	longestMatchLen     uint32
-	distancePairs       int32
-	additionalOffset    int32
-	optimumEndIndex     int32
-	optimumCurrentIndex int32
-	longestMatchFound   bool
-	posSlotPrices       []uint32
-	distancesPrices     []uint32
-	alignPrices         []uint32
-	alignPriceCount     uint32
-	distTableSize       uint32
-	posStateMask        uint32
-	//dictSizePrev        int32
-	//fastBytesPres       int32
-	nowPos          int64
-	finished        bool
+	optimum []*optimal
+
+	isMatch    []uint16
+	isRep      []uint16
+	isRepG0    []uint16
+	isRepG1    []uint16
+	isRepG2    []uint16
+	isRep0Long []uint16
+
+	posSlotCoders []*rangeBitTreeCoder
+
+	posCoders     []uint16
+	posAlignCoder *rangeBitTreeCoder
+
+	lenCoder         *lenPriceTableCoder
+	repMatchLenCoder *lenPriceTableCoder
+
+	litCoder *litCoder
+
+	matchDistances []uint32
+
+	longestMatchLen uint32
+	distancePairs   uint32
+
+	additionalOffset uint32
+
+	optimumEndIndex     uint32
+	optimumCurrentIndex uint32
+
+	longestMatchFound bool
+
+	posSlotPrices   []uint32
+	distancesPrices []uint32
+	alignPrices     []uint32
+	alignPriceCount uint32
+
+	distTableSize uint32
+
+	posStateMask uint32
+
+	nowPos   int64
+	finished bool
+
 	matchFinderType uint32
-	//needReleaseMFStream bool
-	state           int32
+
+	state           uint32
 	prevByte        byte
-	repDistances    []int32
+	repDistances    []uint32
 	matchPriceCount uint32
 
-	//posStateBits uint32 // posBits ?
-	//fastBytes uint32
-	//litPosStateBits uint32
-	//litContextBits uint32
-	//dictSize uint32
-	//matchFinder string
+	reps    []uint32
+	repLens []uint32
+	backRes uint32
 }
 
-func (z *encoder) doEncode() (err os.Error) {
+// signature: c | go | cs
+func (z *encoder) readMatchDistances() (lenRes uint32, err os.Error) {
+	lenRes = 0
+	z.distancePairs, err = z.mf.getMatches(z.matchDistances)
+	if err != nil {
+		return
+	}
+	if z.distancePairs > 0 {
+		lenRes = z.matchDistances[z.distancePairs-2]
+		if lenRes == z.cl.fastBytes {
+			lenRes += z.mf.iw.getMatchLen(int32(lenRes)-1, z.matchDistances[z.distancePairs-1], kMatchMaxLen-lenRes)
+		}
+	}
+	z.additionalOffset++
 	return
+}
+
+// signature: c | go | cs
+func (z *encoder) movePos(num uint32) (err os.Error) {
+	if num > 0 {
+		z.additionalOffset += num
+		err = z.mf.skip(num)
+	}
+	return
+}
+
+// signature: c | go | cs
+func (z *encoder) getPureRepPrice(repIndex, state, posState uint32) (price uint32) {
+	if repIndex == 0 {
+		price = getPrice0(uint32(z.isRepG0[state]))
+		price += getPrice1(uint32(z.isRep0Long[state<<kNumPosStatesBitsMax+posState]))
+	} else {
+		price = getPrice1(uint32(z.isRepG0[state]))
+		if repIndex == 1 {
+			price += getPrice0(uint32(z.isRepG1[state]))
+		} else {
+			price += getPrice1(uint32(z.isRepG1[state]))
+			price += getPrice(uint32(z.isRepG2[state]), repIndex-2)
+		}
+	}
+	return
+}
+
+// signature: c | go | cs
+func (z *encoder) getRepPrice(repIndex, length, state, posState uint32) (price uint32) {
+	price = z.repMatchLenCoder.getPrice(length-kMatchMinLen, posState)
+	price += z.getPureRepPrice(repIndex, state, posState)
+	return
+}
+
+// singature: c | go | cs
+func (z *encoder) getPosLenPrice(pos, length, posState uint32) (price uint32) {
+	lenToPosState := getLenToPosState(length)
+	if pos < kNumFullDistances {
+		price = z.distancesPrices[lenToPosState*kNumFullDistances+pos]
+	} else {
+		price = z.posSlotPrices[lenToPosState*kNumPosSlotBits+getPosSlot2(pos)] + z.alignPrices[pos&kAlignMask]
+	}
+	price += z.lenCoder.getPrice(length-kMatchMinLen, posState)
+	return
+}
+
+// signature: c | go | cs
+func (z *encoder) getPosLen1Price(state, posState uint32) uint32 {
+	return getPrice0(uint32(z.isRepG0[state])) +
+		getPrice0(uint32(z.isRep0Long[state<<kNumPosStatesBitsMax+posState]))
+}
+
+// signature: c | go | cs
+func (z *encoder) backward(cur uint32) uint32 {
+	z.optimumEndIndex = cur
+	posMem := z.optimum[cur].posPrev
+	backMem := z.optimum[cur].backPrev
+	tmp := uint32(1) // execute loop at least once (do-while)
+	for ; tmp > 0; tmp = cur {
+		if z.optimum[cur].prev1IsChar == true {
+			z.optimum[posMem].makeAsChar()
+			z.optimum[posMem].posPrev = posMem - 1
+			if z.optimum[cur].prev2 == true {
+				z.optimum[posMem-1].prev1IsChar = false
+				z.optimum[posMem-1].posPrev = z.optimum[cur].posPrev2
+				z.optimum[posMem-1].backPrev = z.optimum[cur].backPrev2
+			}
+		}
+		posPrev := posMem
+		backCur := backMem
+		backMem = z.optimum[posPrev].backPrev
+		posMem = z.optimum[posPrev].posPrev
+		z.optimum[posPrev].backPrev = backCur
+		z.optimum[posPrev].posPrev = cur
+		cur = posPrev
+	}
+	z.backRes = z.optimum[0].backPrev
+	z.optimumCurrentIndex = z.optimum[0].posPrev
+	return z.optimumCurrentIndex
+}
+
+func (z *encoder) getOptimum(nowPos uint32) uint32 {
+	// TODO: code it
+	return 0
 }
 
 func (z *encoder) fillDistancesPrices() {
@@ -237,7 +343,7 @@ func (z *encoder) fillDistancesPrices() {
 		posSlot := getPosSlot(i)
 		footerBits := posSlot>>1 - 1
 		baseVal := (2 | posSlot&1) << footerBits
-		tempPrices[i] = reverseGetPriceIndex(z.posEncoders, int32(baseVal)-int32(posSlot)-1, footerBits, i-baseVal)
+		tempPrices[i] = reverseGetPriceIndex(z.posCoders, int32(baseVal)-int32(posSlot)-1, footerBits, i-baseVal)
 	}
 	for lenToPosState := uint32(0); lenToPosState < kNumLenToPosStates; lenToPosState++ {
 		var posSlot uint32
@@ -266,6 +372,257 @@ func (z *encoder) fillAlignPrices() {
 	z.alignPriceCount = 0
 }
 
+func (z *encoder) writeEndMarker(posState uint32) (err os.Error) {
+	if z.writeEndMark != true {
+		return
+	}
+	err = z.re.encode(z.isMatch, z.state<<kNumPosStatesBitsMax+posState, 1)
+	if err != nil {
+		return
+	}
+	err = z.re.encode(z.isRep, z.state, 0)
+	if err != nil {
+		return
+	}
+	z.state = stateUpdateMatch(z.state)
+	length := kMatchMinLen
+	err = z.lenCoder.encode(z.re, 0, posState) // 0 is length - kMatchMinLen
+	if err != nil {
+		return
+	}
+	posSlot := 1<<kNumPosSlotBits - 1
+	lenToPosState := getLenToPosState(uint32(length))
+	err = z.posSlotCoders[lenToPosState].encode(z.re, uint32(posSlot))
+	if err != nil {
+		return
+	}
+	footerBits := uint32(30)
+	posReduced := 1<<footerBits - 1
+	err = z.re.encodeDirectBits(int32(posReduced>>kNumAlignBits), int32(footerBits)-kNumAlignBits)
+	if err != nil {
+		return
+	}
+	err = z.posAlignCoder.reverseEncode(z.re, uint32(posReduced&kAlignMask))
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (z *encoder) flush(nowPos uint32) (err os.Error) {
+	err = z.writeEndMarker(uint32(nowPos) & z.posStateMask)
+	if err != nil {
+		return
+	}
+	err = z.re.flushData()
+	if err != nil {
+		return
+	}
+	err = z.re.flushStream()
+	return
+}
+
+func (z *encoder) codeOneBlock() (err os.Error) {
+	z.finished = true
+	progressPosValuePrev := z.nowPos
+	if z.nowPos == 0 {
+		if z.mf.iw.getNumAvailableBytes() == 0 {
+			err = z.flush(uint32(z.nowPos))
+			return
+		}
+		_, err = z.readMatchDistances()
+		if err != nil {
+			return
+		}
+		err = z.re.encode(z.isMatch, uint32(z.state<<kNumPosStatesBitsMax)+uint32(z.nowPos)&z.posStateMask, 0)
+		if err != nil {
+			return
+		}
+		z.state = stateUpdateChar(z.state)
+		// TODO: z.mf.iw.blabla is too long ...
+		curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
+		err = z.litCoder.getCoder(uint32(z.nowPos), z.prevByte).encode(z.re, curByte)
+		if err != nil {
+			return
+		}
+		z.prevByte = curByte
+		z.additionalOffset--
+		z.nowPos++
+	}
+	if z.mf.iw.getNumAvailableBytes() == 0 {
+		err = z.flush(uint32(z.nowPos))
+		return
+	}
+	for {
+		length := z.getOptimum(uint32(z.nowPos))
+		pos := z.backRes
+		posState := uint32(z.nowPos) & z.posStateMask
+		complexState := z.state<<kNumPosStatesBitsMax + posState
+		if length == 1 && pos == 0xFFFFFFFF {
+			err = z.re.encode(z.isMatch, complexState, 0)
+			if err != nil {
+				return
+			}
+			curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
+			lc2 := z.litCoder.getCoder(uint32(z.nowPos), z.prevByte)
+			if stateIsCharState(z.state) == false {
+				matchByte := z.mf.iw.getIndexByte(0 - int32(z.repDistances[0]) - 1 - int32(z.additionalOffset))
+				err = lc2.encodeMatched(z.re, matchByte, curByte)
+				if err != nil {
+					return
+				}
+			} else {
+				err = lc2.encode(z.re, curByte)
+				if err != nil {
+					return
+				}
+			}
+			z.prevByte = curByte
+			z.state = stateUpdateChar(z.state)
+		} else {
+			err = z.re.encode(z.isMatch, complexState, 1)
+			if err != nil {
+				return
+			}
+			if pos < kNumRepDistances {
+				err = z.re.encode(z.isRep, z.state, 1)
+				if err != nil {
+					return
+				}
+				if pos == 0 {
+					err = z.re.encode(z.isRepG0, z.state, 0)
+					if err != nil {
+						return
+					}
+					if length == 1 {
+						err = z.re.encode(z.isRep0Long, complexState, 0)
+						if err != nil {
+							return
+						}
+					} else {
+						err = z.re.encode(z.isRep0Long, complexState, 1)
+						if err != nil {
+							return
+						}
+					}
+				} else {
+					err = z.re.encode(z.isRepG0, z.state, 1)
+					if err != nil {
+						return
+					}
+					if pos == 1 {
+						err = z.re.encode(z.isRepG1, z.state, 0)
+						if err != nil {
+							return
+						}
+					} else {
+						err = z.re.encode(z.isRepG1, z.state, 1)
+						if err != nil {
+							return
+						}
+						err = z.re.encode(z.isRepG2, z.state, uint32(pos-2))
+						if err != nil {
+							return
+						}
+					}
+				}
+				if length == 1 {
+					z.state = stateUpdateShortRep(z.state)
+				} else {
+					err = z.repMatchLenCoder.encode(z.re, uint32(length-kMatchMinLen), posState)
+					if err != nil {
+						return
+					}
+					z.state = stateUpdateRep(z.state)
+				}
+				distance := z.repDistances[pos]
+				if pos != 0 {
+					for i := pos; i >= 1; i-- {
+						z.repDistances[i] = z.repDistances[i-1]
+					}
+					z.repDistances[0] = distance
+				}
+			} else {
+				err = z.re.encode(z.isRep, z.state, 0)
+				if err != nil {
+					return
+				}
+				z.state = stateUpdateMatch(z.state)
+				err = z.lenCoder.encode(z.re, uint32(length-kMatchMinLen), posState)
+				if err != nil {
+					return
+				}
+				pos -= kNumRepDistances
+				posSlot := getPosSlot(uint32(pos))
+				lenToPosState := getLenToPosState(uint32(length))
+				err = z.posSlotCoders[lenToPosState].encode(z.re, posSlot)
+				if err != nil {
+					return
+				}
+				if posSlot >= kStartPosModelIndex {
+					footerBits := posSlot>>1 - 1
+					baseVal := (2 | posSlot&1) << footerBits
+					posReduced := pos - baseVal
+					if posSlot < kEndPosModelIndex {
+						err = reverseEncodeIndex(z.re, z.posCoders, int32(baseVal)-int32(posSlot)-1, footerBits, uint32(posReduced))
+						if err != nil {
+							return
+						}
+					} else {
+						err = z.re.encodeDirectBits(int32(posReduced)>>kNumAlignBits, int32(footerBits)-kNumAlignBits)
+						if err != nil {
+							return
+						}
+						err = z.posAlignCoder.reverseEncode(z.re, uint32(posReduced&kAlignMask))
+						if err != nil {
+							return
+						}
+						z.alignPriceCount++
+					}
+				}
+				for i := kNumRepDistances - 1; i >= 1; i-- {
+					z.repDistances[i] = z.repDistances[i-1]
+				}
+				z.repDistances[0] = pos
+				z.matchPriceCount++
+			}
+			z.prevByte = z.mf.iw.getIndexByte(int32(length) - 1 - int32(z.additionalOffset))
+		}
+		z.additionalOffset -= length
+		z.nowPos += int64(length)
+		if z.additionalOffset == 0 {
+			if z.matchPriceCount >= 1<<7 {
+				z.fillDistancesPrices()
+			}
+			if z.alignPriceCount >= kAlignTableSize {
+				z.fillAlignPrices()
+			}
+			if z.mf.iw.getNumAvailableBytes() == 0 {
+				err = z.flush(uint32(z.nowPos))
+				return
+			}
+			if z.nowPos-progressPosValuePrev >= 1<<12 {
+				z.finished = false
+				return
+			}
+		}
+	}
+	return
+}
+
+func (z *encoder) doEncode() (err os.Error) {
+	for {
+		err = z.codeOneBlock()
+		if err != nil {
+			return
+		}
+		if z.finished == true {
+			break
+		}
+	}
+	return
+}
+
 func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err os.Error) {
 	if level < 1 || level > 9 {
 		return os.NewError("level out of range: " + string(level))
@@ -287,7 +644,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	}
 
 	header := make([]byte, lzmaHeaderSize)
-	header[0] = byte((z.cl.posBits*5+z.cl.litPosBits)*9 + z.cl.litContextBits)
+	header[0] = byte((z.cl.posStateBits*5+z.cl.litPosStateBits)*9 + z.cl.litContextBits)
 	for i := uint32(0); i < 4; i++ {
 		header[i+1] = byte(z.cl.dictSize >> (8 * i))
 	}
@@ -308,11 +665,11 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	if err != nil {
 		return
 	}
-	numHashBytes := int32(4)
+	numHashBytes := uint32(4)
 	if z.matchFinderType == eMatchFinderTypeBT2 {
 		numHashBytes = 2
 	}
-	z.matchFinder, err = newLzBinTree(r, int32(z.cl.dictSize), kNumOpts, int32(z.cl.fastBytes), kMatchMaxLen+1, numHashBytes)
+	z.mf, err = newLzBinTree(r, z.cl.dictSize, kNumOpts, z.cl.fastBytes, kMatchMaxLen+1, numHashBytes)
 	if err != nil {
 		return
 	}
@@ -331,14 +688,12 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	for i := 0; i < kNumLenToPosStates; i++ {
 		z.posSlotCoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
-	z.posEncoders = make([]uint16, kNumFullDistances-kEndPosModelIndex)
+	z.posCoders = make([]uint16, kNumFullDistances-kEndPosModelIndex)
 	z.posAlignCoder = newRangeBitTreeCoder(kNumAlignBits)
-	z.lenCoder = newLenPriceTableCoder(z.cl.fastBytes+1-kMatchMinLen, 1<<z.cl.posBits)
-	z.repLenCoder = newLenPriceTableCoder(z.cl.fastBytes+1-kMatchMinLen, 1<<z.cl.posBits)
-	z.litCoder = newLitCoder(z.cl.litPosBits, z.cl.litContextBits)
+	z.lenCoder = newLenPriceTableCoder(z.cl.fastBytes+1-kMatchMinLen, 1<<z.cl.posStateBits)
+	z.repMatchLenCoder = newLenPriceTableCoder(z.cl.fastBytes+1-kMatchMinLen, 1<<z.cl.posStateBits)
+	z.litCoder = newLitCoder(z.cl.litPosStateBits, z.cl.litContextBits)
 	z.matchDistances = make([]uint32, kMatchMaxLen*2+2)
-	//z.longestMatchLen = uninitialized
-	//z.distancePairs = unitialized
 	z.additionalOffset = 0
 	z.optimumEndIndex = 0
 	z.optimumCurrentIndex = 0
@@ -346,17 +701,9 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	z.posSlotPrices = make([]uint32, 1<<(kNumPosSlotBits+kNumLenToPosStatesBits))
 	z.distancesPrices = make([]uint32, kNumFullDistances<<kNumLenToPosStatesBits)
 	z.alignPrices = make([]uint32, kAlignTableSize)
-	//for i := uint32(0); i < kAlignTableSize; i++ {
-	//	z.alignPrices[i] = z.posAlignCoder.reverseGetPrice(i)
-	//}
-	//z.alignPriceCount = 0
-	//z.distTableSize = kDefaultDictionaryLogSize * 2
-	z.posStateMask = 1<<z.cl.posBits - 1
-	//z.dictSizePrev = -1
-	//z.fastBytesPrev = -1
+	z.posStateMask = 1<<z.cl.posStateBits - 1
 	z.nowPos = 0
 	z.finished = false
-	//z.needReleaseMFStream = hz
 
 	z.state = 0
 	z.prevByte = 0
