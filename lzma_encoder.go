@@ -298,7 +298,7 @@ func (z *encoder) getPosLenPrice(pos, length, posState uint32) (price uint32) {
 }
 
 // signature: c | go | cs
-func (z *encoder) getPosLen1Price(state, posState uint32) uint32 {
+func (z *encoder) getRepLen1Price(state, posState uint32) uint32 {
 	return getPrice0(uint32(z.isRepG0[state])) +
 		getPrice0(uint32(z.isRep0Long[state<<kNumPosStatesBitsMax+posState]))
 }
@@ -332,9 +332,132 @@ func (z *encoder) backward(cur uint32) uint32 {
 	return z.optimumCurrentIndex
 }
 
-func (z *encoder) getOptimum(nowPos uint32) uint32 {
-	// TODO: code it
-	return 0
+func (z *encoder) getOptimum(position uint32) (res uint32, err os.Error) {
+	if z.optimumEndIndex != z.optimumCurrentIndex {
+		lenRes := z.optimum[z.optimumCurrentIndex].posPrev - z.optimumCurrentIndex
+		z.backRes = z.optimum[z.optimumCurrentIndex].backPrev
+		z.optimumCurrentIndex = z.optimum[z.optimumCurrentIndex].posPrev
+		res = lenRes
+		return
+	}
+
+	z.optimumEndIndex = 0
+	z.optimumCurrentIndex = 0
+	var lenMain uint32
+	var distancePairs uint32
+	if z.longestMatchFound != true {
+		lenMain, err = z.readMatchDistances()
+		if err != nil {
+			return
+		}
+	} else {
+		lenMain = z.longestMatchLen
+		z.longestMatchFound = false
+	}
+	distancePairs = z.distancePairs
+	availableBytes := z.mf.iw.getNumAvailableBytes() + 1
+	if availableBytes < 2 {
+		z.backRes = 0xFFFFFFFF
+		res = 1
+		return
+	}
+
+	if availableBytes > kMatchMaxLen {
+		availableBytes = kMatchMaxLen
+	}
+	repMaxIndex := uint32(0)
+	for i := uint32(0); i < kNumRepDistances; i++ {
+		z.reps[i] = z.repDistances[i]
+		z.repLens[i] = z.mf.iw.getMatchLen(0-1, z.reps[i], kMatchMaxLen)
+		if z.repLens[i] > z.repLens[repMaxIndex] {
+			repMaxIndex = i
+		}
+	}
+	if z.repLens[repMaxIndex] > z.cl.fastBytes {
+		z.backRes = repMaxIndex
+		lenRes := z.repLens[repMaxIndex]
+		res = lenRes
+		err = z.movePos(lenRes - 1)
+		return
+	}
+
+	if lenMain > z.cl.fastBytes {
+		z.backRes = z.matchDistances[distancePairs-1] + kNumRepDistances
+		res = lenMain
+		err = z.movePos(lenMain - 1)
+		return
+	}
+
+	curByte := z.mf.iw.getIndexByte(0 - 1)
+	matchByte := z.mf.iw.getIndexByte(0 - int32(z.repDistances[0]) - 1 - 1)
+	if lenMain < 2 && curByte != matchByte && z.repLens[repMaxIndex] < 2 {
+		z.backRes = 0xFFFFFFFF
+		res = 1
+		return
+	}
+
+	z.optimum[0].state = z.state
+	posState := position & z.posStateMask
+	z.optimum[1].price = getPrice0(uint32(z.isMatch[z.state<<kNumPosStatesBitsMax+posState])) +
+		z.litCoder.getCoder(position, z.prevByte).getPrice(!stateIsCharState(z.state), matchByte, curByte)
+	z.optimum[1].makeAsChar()
+
+	matchPrice := getPrice1(uint32(z.isMatch[z.state<<kNumPosStatesBitsMax+posState]))
+	repMatchPrice := matchPrice + getPrice1(uint32(z.isRep[z.state]))
+	if matchByte == curByte {
+		shortRepPrice := repMatchPrice + z.getRepLen1Price(z.state, posState)
+		if shortRepPrice < z.optimum[1].price {
+			z.optimum[1].price = shortRepPrice
+			z.optimum[1].makeAsShortRep()
+		}
+	}
+
+	lenEnd := z.repLens[repMaxIndex]
+	if lenMain > lenEnd {
+		lenEnd = lenMain
+	}
+	if lenEnd < 2 {
+		z.backRes = z.optimum[1].backPrev
+		res = 1
+		return
+	}
+
+	z.optimum[1].posPrev = 0
+	z.optimum[0].backs0 = z.reps[0]
+	z.optimum[0].backs1 = z.reps[1]
+	z.optimum[0].backs2 = z.reps[2]
+	z.optimum[0].backs3 = z.reps[3]
+
+	length := lenEnd
+dowhile1:
+	z.optimum[length].price = kIfinityPrice
+	if length--; length >= 2 {
+		// out of about 30 while's, there are only 2 of them that can't be expressed without a goto
+		// statement; the other occurence of goto explains why code duplicaions isn't an option
+		goto dowhile1
+	}
+
+	for i := uint32(0); i < kNumRepDistances; i++ {
+		repLen := z.repLens[i]
+		if repLen < 2 {
+			continue
+		}
+		price := repMatchPrice + z.getPureRepPrice(i, z.state, posState)
+	dowhile2:
+		curAndLenPrice := price + z.repMatchLenCoder.getPrice(repLen-2, posState)
+		optimum := z.optimum[repLen]
+		if curAndLenPrice < optimum.price {
+			optimum.price = curAndLenPrice
+			optimum.posPrev = 0
+			optimum.backPrev = i
+			optimum.prev1IsChar = false
+		}
+		if repLen--; repLen >= 2 {
+			goto dowhile2
+		}
+	}
+
+	return
 }
 
 func (z *encoder) fillDistancesPrices() {
@@ -454,7 +577,10 @@ func (z *encoder) codeOneBlock() (err os.Error) {
 		return
 	}
 	for {
-		length := z.getOptimum(uint32(z.nowPos))
+		length, err := z.getOptimum(uint32(z.nowPos))
+		if err != nil {
+			return
+		}
 		pos := z.backRes
 		posState := uint32(z.nowPos) & z.posStateMask
 		complexState := z.state<<kNumPosStatesBitsMax + posState
