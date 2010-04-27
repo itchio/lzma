@@ -9,5 +9,6 @@ GOFILES=\
 	lit_coder.go\
 	range_bit_tree_coder.go\
 	range_coder.go\
+	util.go\
 
 include $(GOROOT)/src/Make.pkg

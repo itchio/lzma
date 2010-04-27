@@ -164,7 +164,7 @@ func (o *optimal) isShortRep() bool {
 const (
 	eMatchFinderTypeBT2  = 0
 	eMatchFinderTypeBT4  = 1
-	kIfinityPrice        = 0xFFFFFFF
+	kInfinityPrice       = 0xFFFFFFF
 	kDefaultDicLogSize   = 22
 	kNumFastBytesDefault = 0x20
 	kNumLenSpecSymbols   = kNumLowLenSymbols + kNumMidLenSymbols
@@ -430,10 +430,10 @@ func (z *encoder) getOptimum(position uint32) (res uint32, err os.Error) {
 
 	length := lenEnd
 dowhile1:
-	z.optimum[length].price = kIfinityPrice
+	z.optimum[length].price = kInfinityPrice
 	if length--; length >= 2 {
-		// out of about 30 while's, there are only 2 of them that can't be expressed without a goto
-		// statement; the other occurence of goto explains why code duplicaions isn't an option
+		// out of about 30 while's, only 3 of them that can't be expressed without a goto
+		// statement; the other occurences of goto explain why code duplicaions isn't an option
 		goto dowhile1
 	}
 
@@ -457,6 +457,325 @@ dowhile1:
 		}
 	}
 
+	normalMatchPrice := matchPrice + getPrice0(uint32(z.isRep[z.state]))
+	length = 2
+	if z.repLens[0] >= 2 {
+		length = z.repLens[0] + 1
+	}
+	if length <= lenMain {
+		offs := uint32(0)
+		for length > z.matchDistances[offs] {
+			offs += 2
+		}
+		for ; ; length++ {
+			distance := z.matchDistances[offs+1]
+			curAndLenPrice := normalMatchPrice + z.getPosLenPrice(distance, length, posState)
+			optimum := z.optimum[length]
+			if curAndLenPrice < optimum.price {
+				optimum.price = curAndLenPrice
+				optimum.posPrev = 0
+				optimum.backPrev = distance + kNumRepDistances
+				optimum.prev1IsChar = false
+			}
+			if length == z.matchDistances[offs] {
+				offs += 2
+				if offs == distancePairs {
+					break
+				}
+			}
+		}
+	}
+
+	cur := uint32(0)
+	for {
+		cur++
+		if cur == lenEnd {
+			res = z.backward(cur)
+			return
+		}
+
+		newLen, err := z.readMatchDistances()
+		if err != nil {
+			return
+		}
+		distancePairs = z.distancePairs
+		if newLen >= z.cl.fastBytes {
+			z.longestMatchLen = newLen
+			z.longestMatchFound = true
+			res = z.backward(cur)
+			return
+		}
+
+		position++
+		posPrev := z.optimum[cur].posPrev
+		var state uint32
+		if z.optimum[cur].prev1IsChar == true {
+			posPrev--
+			if z.optimum[cur].prev2 == true {
+				state = z.optimum[z.optimum[cur].posPrev2].state
+				if z.optimum[cur].backPrev2 < kNumRepDistances {
+					state = stateUpdateRep(state)
+				} else {
+					state = stateUpdateMatch(state)
+				}
+			} else {
+				state = z.optimum[posPrev].state
+			}
+			state = stateUpdateChar(state)
+		} else {
+			state = z.optimum[posPrev].state
+		}
+		if posPrev == cur-1 {
+			if z.optimum[cur].isShortRep() == true {
+				state = stateUpdateShortRep(state)
+			} else {
+				state = stateUpdateChar(state)
+			}
+		} else {
+			var pos uint32
+			if z.optimum[cur].prev1IsChar == true && z.optimum[cur].prev2 == true {
+				posPrev = z.optimum[cur].posPrev2
+				pos = z.optimum[cur].backPrev2
+				state = stateUpdateRep(state)
+			} else {
+				pos = z.optimum[cur].backPrev
+				if pos < kNumRepDistances {
+					state = stateUpdateRep(state)
+				} else {
+					state = stateUpdateMatch(state)
+				}
+			}
+			opt := z.optimum[posPrev]
+			if pos < kNumRepDistances {
+				if pos == 0 {
+					z.reps[0] = opt.backs0
+					z.reps[1] = opt.backs1
+					z.reps[2] = opt.backs2
+					z.reps[3] = opt.backs3
+				} else if pos == 1 {
+					z.reps[0] = opt.backs1
+					z.reps[1] = opt.backs0
+					z.reps[2] = opt.backs2
+					z.reps[3] = opt.backs3
+				} else if pos == 2 {
+					z.reps[0] = opt.backs2
+					z.reps[1] = opt.backs0
+					z.reps[2] = opt.backs1
+					z.reps[3] = opt.backs3
+				} else {
+					z.reps[0] = opt.backs3
+					z.reps[1] = opt.backs0
+					z.reps[2] = opt.backs1
+					z.reps[3] = opt.backs2
+				}
+			} else {
+				z.reps[0] = pos - kNumRepDistances
+				z.reps[1] = opt.backs0
+				z.reps[2] = opt.backs1
+				z.reps[3] = opt.backs2
+			}
+		}
+		z.optimum[cur].state = state
+		z.optimum[cur].backs0 = z.reps[0]
+		z.optimum[cur].backs1 = z.reps[1]
+		z.optimum[cur].backs2 = z.reps[2]
+		z.optimum[cur].backs2 = z.reps[3]
+		curPrice := z.optimum[cur].price
+
+		curByte = z.mf.iw.getIndexByte(0 - 1)
+		matchByte = z.mf.iw.getIndexByte(0 - int32(z.reps[0]) - 1 - 1)
+		posState = position & z.posStateMask
+		curAnd1Price := curPrice + getPrice0(uint32(z.isMatch[state<<kNumPosStatesBitsMax+posState])) +
+			z.litCoder.getCoder(position, z.mf.iw.getIndexByte(0-2)).getPrice(!stateIsCharState(state), matchByte, curByte)
+
+		nextOptimum := z.optimum[cur+1]
+		nextIsChar := false
+		if curAnd1Price < nextOptimum.price {
+			nextOptimum.price = curAnd1Price
+			nextOptimum.posPrev = cur
+			nextOptimum.makeAsChar()
+			nextIsChar = true
+		}
+
+		matchPrice = curPrice + getPrice1(uint32(z.isMatch[state<<kNumPosStatesBitsMax+posState]))
+		repMatchPrice = matchPrice + getPrice1(uint32(z.isRep[state]))
+		if matchByte == curByte && !(nextOptimum.posPrev < cur && nextOptimum.backPrev == 0) {
+			shortRepPrice := repMatchPrice + z.getRepLen1Price(state, posState)
+			if shortRepPrice <= nextOptimum.price {
+				nextOptimum.price = shortRepPrice
+				nextOptimum.posPrev = cur
+				nextOptimum.makeAsShortRep()
+				nextIsChar = true
+			}
+		}
+
+		availableBytesFull := z.mf.iw.getNumAvailableBytes() + 1
+		availableBytesFull = minUInt32(kNumOpts-1-cur, availableBytesFull)
+		availableBytes = availableBytesFull
+		if availableBytes < 2 {
+			continue
+		}
+		if availableBytes > z.cl.fastBytes {
+			availableBytes = z.cl.fastBytes
+		}
+		if nextIsChar == false && matchByte != curByte {
+			t := minUInt32(availableBytesFull-1, z.cl.fastBytes)
+			lenTest2 := z.mf.iw.getMatchLen(0, z.reps[0], t)
+			if lenTest2 >= 2 {
+				state2 := stateUpdateChar(state)
+				posStateNext := (position + 1) & z.posStateMask
+				nextRepMatchPrice := curAnd1Price + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
+					getPrice1(uint32(z.isRep[state2]))
+				offset := cur + 1 + lenTest2
+				for lenEnd < offset {
+					lenEnd++
+					z.optimum[lenEnd].price = kInfinityPrice
+				}
+				curAndLenPrice := nextRepMatchPrice + z.getRepPrice(0, lenTest2, state2, posStateNext)
+				optimum := z.optimum[offset]
+				if curAndLenPrice < optimum.price {
+					optimum.price = curAndLenPrice
+					optimum.posPrev = cur + 1
+					optimum.backPrev = 0
+					optimum.prev1IsChar = true
+					optimum.prev2 = false
+				}
+			}
+		}
+
+		startLen := uint32(2)
+		for repIndex := uint32(0); repIndex < kNumRepDistances; repIndex++ {
+			lenTest := z.mf.iw.getMatchLen(0-1, z.reps[repIndex], availableBytes)
+			if lenTest < 2 {
+				continue
+			}
+			lenTestTemp := lenTest
+		dowhile3:
+			for lenEnd < cur+lenTest {
+				lenEnd++
+				z.optimum[lenEnd].price = kInfinityPrice
+			}
+			curAndLenPrice := repMatchPrice + z.getRepPrice(repIndex, lenTest, state, posState)
+			optimum := z.optimum[cur+lenTest]
+			if curAndLenPrice < optimum.price {
+				optimum.price = curAndLenPrice
+				optimum.posPrev = cur
+				optimum.backPrev = repIndex
+				optimum.prev1IsChar = false
+			}
+			if lenTest--; lenTest >= 2 {
+				goto dowhile3
+			}
+
+			lenTest = lenTestTemp
+			if repIndex == 0 {
+				startLen = lenTest + 1
+			}
+
+			if lenTest < availableBytesFull {
+				t := minUInt32(availableBytesFull-1-1, z.cl.fastBytes)
+				lenTest2 := z.mf.iw.getMatchLen(int32(lenTest), z.reps[repIndex], t)
+				if lenTest2 >= 2 {
+					state2 := stateUpdateRep(state)
+					posStateNext := (position + lenTest) & z.posStateMask
+					curAndLenCharPrice := repMatchPrice + z.getRepPrice(repIndex, lenTest, state, posState) +
+						getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
+						z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
+							true, z.mf.iw.getIndexByte(int32(lenTest)-int32(z.reps[repIndex])), z.mf.iw.getIndexByte(int32(lenTest)-1))
+					state2 = stateUpdateChar(state2)
+					posStateNext = (position + lenTest + 1) & z.posStateMask
+					nextMatchPrice := curAndLenCharPrice + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
+					nextRepMatchPrice := nextMatchPrice + getPrice1(uint32(z.isRep[state2]))
+
+					offset := lenTest + 1 + lenTest2
+					for lenEnd < cur+offset {
+						lenEnd++
+						z.optimum[lenEnd].price = kInfinityPrice
+					}
+					curAndLenPrice := nextRepMatchPrice + z.getRepPrice(0, lenTest2, state2, posStateNext)
+					optimum := z.optimum[cur+offset]
+					if curAndLenPrice < optimum.price {
+						optimum.price = curAndLenPrice
+						optimum.posPrev = cur + lenTest + 1
+						optimum.backPrev = 0
+						optimum.prev1IsChar = true
+						optimum.prev2 = true
+						optimum.posPrev2 = cur
+						optimum.backPrev2 = repIndex
+					}
+				}
+			}
+		}
+
+		if newLen > availableBytes {
+			newLen = availableBytes
+			for distancePairs = 0; newLen > z.matchDistances[distancePairs]; distancePairs += 2 {
+				// empty loop
+			}
+			z.matchDistances[distancePairs] = newLen
+			distancePairs += 2
+		}
+		if newLen >= startLen {
+			normalMatchPrice = matchPrice + getPrice0(uint32(z.isRep[state]))
+			for lenEnd < cur+newLen {
+				lenEnd++
+				z.optimum[lenEnd].price = kInfinityPrice
+			}
+			offs := uint32(0)
+			for startLen > z.matchDistances[offs] {
+				offs += 2
+			}
+
+			for lenTest := startLen; ; lenTest++ {
+				curBack := z.matchDistances[offs+1]
+				curAndLenPrice := normalMatchPrice + z.getPosLenPrice(curBack, lenTest, posState)
+				optimum := z.optimum[cur+lenTest]
+				if curAndLenPrice < optimum.price {
+					optimum.price = curAndLenPrice
+					optimum.posPrev = cur
+					optimum.backPrev = curBack + kNumRepDistances
+					optimum.prev1IsChar = false
+				}
+				if lenTest == z.matchDistances[offs] {
+					if lenTest < availableBytesFull {
+						t := minUInt32(availableBytesFull-1-lenTest, z.cl.fastBytes)
+						lenTest2 := z.mf.iw.getMatchLen(int32(lenTest), curBack, t)
+						if lenTest2 >= 2 {
+							state2 := stateUpdateMatch(state)
+							posStateNext := (position + lenTest) & z.posStateMask
+							curAndLenCharPrice := curAndLenPrice + getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
+								z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
+									true, z.mf.iw.getIndexByte(int32(lenTest)-int32(curBack)), z.mf.iw.getIndexByte(int32(lenTest)-1))
+							state2 = stateUpdateChar(state2)
+							posStateNext = (position + lenTest + 1) & z.posStateMask
+							nextMatchPrice := curAndLenCharPrice + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
+							nextRepMatchPrice := nextMatchPrice + getPrice1(uint32(z.isRep[state2]))
+							offset := lenTest + 1 + lenTest2
+							for lenEnd < cur+offset {
+								lenEnd++
+								z.optimum[lenEnd].price = kInfinityPrice
+							}
+							curAndLenPrice = nextRepMatchPrice + z.getRepPrice(0, lenTest2, state2, posStateNext)
+							optimum = z.optimum[cur+offset]
+							if curAndLenPrice < optimum.price {
+								optimum.price = curAndLenPrice
+								optimum.posPrev = cur + lenTest + 1
+								optimum.backPrev = 0
+								optimum.prev1IsChar = true
+								optimum.prev2 = true
+								optimum.posPrev2 = cur
+								optimum.backPrev2 = curBack + kNumRepDistances
+							}
+						}
+					}
+					offs += 2
+					if offs == distancePairs {
+						break
+					}
+				}
+			}
+		}
+	}
 	return
 }
 
