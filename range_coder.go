@@ -152,18 +152,15 @@ func newRangeEncoder(w io.Writer) *rangeEncoder {
 	}
 }
 
-func (re *rangeEncoder) flushData() (err os.Error) {
+func (re *rangeEncoder) flush() (err os.Error) {
 	for i := 0; i < 5; i++ {
-		err := re.shiftLow()
+		err = re.shiftLow()
 		if err != nil {
 			return
 		}
 	}
+	err = re.w.Flush()
 	return
-}
-
-func (re *rangeEncoder) flushStream() os.Error {
-	return re.w.Flush()
 }
 
 func (re *rangeEncoder) shiftLow() (err os.Error) {

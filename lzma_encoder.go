@@ -20,6 +20,11 @@ type syncPipeReader struct {
 	closeChan chan bool
 }
 
+// only for streams (size == -1)
+// the syncPipeReader remains in the library and is closed when err == EOF
+// or number of read bytes is zero n == 0 (it closes *after* the syncPipeWriter's
+// close method is called, but *before* it returns).
+// in other words, sw.Close() shouldn't kill ongoing sr.Read() calls
 func (sr *syncPipeReader) CloseWithError(err os.Error) os.Error {
 	retErr := sr.PipeReader.CloseWithError(err)
 	sr.closeChan <- true // finish writer close
@@ -31,6 +36,9 @@ type syncPipeWriter struct {
 	closeChan chan bool
 }
 
+// only for streams (size == -1)
+// a syncPipeWriter is returned to the user into which he writes data and closes it
+// when he wishes; it's *closed* before the syncPipeReade, but waits for it to close
 func (sw *syncPipeWriter) Close() os.Error {
 	err := sw.PipeWriter.Close()
 	<-sw.closeChan // wait for reader close
@@ -1164,11 +1172,7 @@ func (z *encoder) flush(nowPos uint32) (err os.Error) {
 	if err != nil {
 		return
 	}
-	err = z.re.flushData()
-	if err != nil {
-		return
-	}
-	err = z.re.flushStream()
+	err = z.re.flush()
 	return
 }
 
@@ -1512,10 +1516,9 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // to w, or choose another contructor which uses -1 for the size and writes a
 // marker of 6 bytes at the end of the stream.
 //
-func NewEncoderFileLevel(w io.Writer, size int64, level int) io.WriteCloser {
+func NewEncoderFileLevel(w io.Writer, size int64, level int) (pwc io.WriteCloser) {
 	var z encoder
 	pr, pw := syncPipe()
-	//pr, pw := io.Pipe()
 	go func() {
 		err := z.encoder(pr, w, size, level)
 		pr.CloseWithError(err)
