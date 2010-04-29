@@ -27,3 +27,10 @@ func maxUInt32(left uint32, right uint32) uint32 {
 	}
 	return right
 }
+
+
+// some vars to aid debugging process
+
+var navn bool = false
+var p67 bool = false
+var zr198 int = 0
