@@ -1,7 +1,7 @@
 package lzma
 
 import "os"
-import "fmt"
+//import "fmt"
 
 type litCoder2 struct {
 	coders []uint16
@@ -89,7 +89,7 @@ func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) (e
 
 func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 
-	fmt.Printf("[0] lc2.getPrice(): matchMode = %t, matchByte = %d, symbol = %d\n", matchMode, int8(matchByte), int8(symbol))
+	//fmt.Printf("[0] lc2.getPrice(): matchMode = %t, matchByte = %d, symbol = %d\n", matchMode, int8(matchByte), int8(symbol))
 
 	price := uint32(0)
 	context := uint32(1)
@@ -112,7 +112,7 @@ func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 		context = context<<1 | uint32(bit)
 	}
 
-	fmt.Printf("[1] lc2.getPrice(): price = %d\n", price)
+	//fmt.Printf("[1] lc2.getPrice(): price = %d\n", price)
 
 	return price
 }
@@ -145,9 +145,9 @@ func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
 func (lc *litCoder) getCoder(pos uint32, prevByte byte) *litCoder2 {
 	lc2 := lc.coders[((pos&lc.posMask)<<lc.numPrevBits)+uint32((prevByte&0xff)>>(8-lc.numPrevBits))]
 
-	fmt.Printf("[0] litCoder.getCoder(): pos = %d, prevByte = %d, lc.posMask = %d, lc.numPrevBits = %d, index = %d\n",
-		pos, int8(prevByte), lc.posMask, lc.numPrevBits,
-		((pos&lc.posMask)<<lc.numPrevBits)+uint32((prevByte&0xff)>>(8-lc.numPrevBits)))
+	//fmt.Printf("[0] litCoder.getCoder(): pos = %d, prevByte = %d, lc.posMask = %d, lc.numPrevBits = %d, index = %d\n",
+	//	pos, int8(prevByte), lc.posMask, lc.numPrevBits,
+	//	((pos&lc.posMask)<<lc.numPrevBits)+uint32((prevByte&0xff)>>(8-lc.numPrevBits)))
 
 	return lc2
 }

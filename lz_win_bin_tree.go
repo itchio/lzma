@@ -2,7 +2,7 @@ package lzma
 
 import (
 	"io"
-	"fmt"
+	//"fmt"
 	"os"
 )
 
@@ -181,8 +181,8 @@ func (iw *lzInWindow) movePos() (err os.Error) {
 func (iw *lzInWindow) getIndexByte(index int32) byte {
 	res := iw.buf[int32(iw.bufOffset+iw.pos)+index]
 
-	fmt.Printf("[0] iw.getIndexByte(): index = %d, len(iw.buf) = %d, iw.bufOffset = %d, iw.pos = %d, theIndex = %d, res = %d\n",
-		index, len(iw.buf), int32(iw.bufOffset), iw.pos, int32(iw.bufOffset+iw.pos)+index, int8(res))
+	//fmt.Printf("[0] iw.getIndexByte(): index = %d, len(iw.buf) = %d, iw.bufOffset = %d, iw.pos = %d, theIndex = %d, res = %d\n",
+	//	index, len(iw.buf), int32(iw.bufOffset), iw.pos, int32(iw.bufOffset+iw.pos)+index, int8(res))
 
 	return res
 }
@@ -259,8 +259,8 @@ type lzBinTree struct {
 // signature: c | go | cs (in cs compressionLevel fields are signed, but for no good reason)
 func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes uint32) (bt *lzBinTree, err os.Error) {
 
-	fmt.Printf("[0] bt.newLzBinTree(): historySize = %d, keepAddBufBefore= %d, matchMaxLen = %d, keepAddBufAfter = %d\n",
-		historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter)
+	//fmt.Printf("[0] bt.newLzBinTree(): historySize = %d, keepAddBufBefore= %d, matchMaxLen = %d, keepAddBufAfter = %d\n",
+	//	historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter)
 
 	bt = &lzBinTree{
 		son:           make([]uint32, (historySize+1)*2),
@@ -351,7 +351,7 @@ func (bt *lzBinTree) movePos() (err os.Error) {
 func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
 	var lenLimit uint32
 
-	fmt.Printf("[0] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos)
+	//fmt.Printf("[0] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos)
 
 	if bt.iw.pos+bt.matchMaxLen <= bt.iw.streamPos {
 		lenLimit = bt.matchMaxLen
@@ -363,14 +363,15 @@ func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
 				return
 			}
 
-			fmt.Printf("[1] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d, result = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck, 0)
+			//fmt.Printf("[1] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d, " +
+			//	"result = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck, 0)
 
 			return 0, nil
 		}
 	}
 
-	fmt.Printf("[2] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d\n",
-		bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck)
+	//fmt.Printf("[2] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d\n",
+	//	bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck)
 
 	offset := uint32(0)
 	matchMinPos := uint32(0)
@@ -387,26 +388,26 @@ func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
 		tmp := crcTable[bt.iw.buf[cur]] ^ uint32(bt.iw.buf[cur+1])
 		hash2Value = tmp & (kHash2Size - 1)
 
-		fmt.Printf("[3] z.mf.getMatches(): bt.iw.buf[cur] = %d, bt.iw.buf[cur+1] = %d, crcTable[bt.iw.buf[cur]] = %d, uint32(bt.iw.buf[cur+1]) = %d\n",
-			bt.iw.buf[cur], bt.iw.buf[cur+1], int32(crcTable[bt.iw.buf[cur]]), uint32(bt.iw.buf[cur+1]))
+		//fmt.Printf("[3] z.mf.getMatches(): bt.iw.buf[cur] = %d, bt.iw.buf[cur+1] = %d, crcTable[bt.iw.buf[cur]] = %d, uint32(bt.iw.buf[cur+1]) = %d\n",
+		//	bt.iw.buf[cur], bt.iw.buf[cur+1], int32(crcTable[bt.iw.buf[cur]]), uint32(bt.iw.buf[cur+1]))
 
-		fmt.Printf("[4] z.mf.getMatches(): tmp = %d, hash2Value = %d, hash3Value = %d, cur = %d, kHash2Size = %d\n",
-			int32(tmp), hash2Value, hash3Value, cur, kHash2Size)
+		//fmt.Printf("[4] z.mf.getMatches(): tmp = %d, hash2Value = %d, hash3Value = %d, cur = %d, kHash2Size = %d\n",
+		//	int32(tmp), hash2Value, hash3Value, cur, kHash2Size)
 
 		tmp ^= uint32(bt.iw.buf[cur+2]) << 8
 		hash3Value = tmp & (kHash3Size - 1)
 		hashValue = (tmp ^ crcTable[bt.iw.buf[cur+3]]<<5) & bt.hashMask
 
-		fmt.Printf("[5] z.mf.getMatches(): tmp = %d, hashValue = %d, hash2Value = %d, hash3Value = %d,"+
-			" cur = %d, kHash2Size = %d, kHash3Size = %d, bt.hashMask = %d\n",
-			int32(tmp), hashValue, hash2Value, hash3Value, cur, kHash2Size, kHash3Size, bt.hashMask)
+		//fmt.Printf("[5] z.mf.getMatches(): tmp = %d, hashValue = %d, hash2Value = %d, hash3Value = %d,"+
+		//	" cur = %d, kHash2Size = %d, kHash3Size = %d, bt.hashMask = %d\n",
+		//	int32(tmp), hashValue, hash2Value, hash3Value, cur, kHash2Size, kHash3Size, bt.hashMask)
 
 	} else {
 		hashValue = uint32(bt.iw.buf[cur]) ^ uint32(bt.iw.buf[cur+1])<<8
 	}
 
-	fmt.Printf("[6] z.mf.getMatches(): offset = %d, matchMinPos = %d, cur = %d, maxLen = %d, hashValue = %d, hash2Value = %d, hash3Value = %d, bt.hashArray = %t\n",
-		offset, matchMinPos, cur, maxLen, hashValue, hash2Value, hash3Value, bt.hashArray)
+	//fmt.Printf("[6] z.mf.getMatches(): offset = %d, matchMinPos = %d, cur = %d, maxLen = %d, hashValue = %d, hash2Value = %d, hash3Value = %d, bt.hashArray = %t\n",
+	//	offset, matchMinPos, cur, maxLen, hashValue, hash2Value, hash3Value, bt.hashArray)
 
 	curMatch := bt.hash[bt.kvFixHashSize+hashValue]
 	if bt.hashArray == true {
@@ -520,7 +521,8 @@ func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
 
 	err = bt.movePos()
 
-	fmt.Printf("[7] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d, result = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck, offset)
+	//fmt.Printf("[7] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d, result = %d\n",
+	//	bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck, offset)
 
 	return offset, err
 }

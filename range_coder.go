@@ -2,7 +2,7 @@ package lzma
 
 import (
 	"bufio"
-	"fmt"
+	//"fmt"
 	"io"
 	"os"
 )
@@ -169,12 +169,12 @@ func (re *rangeEncoder) flushStream() os.Error {
 func (re *rangeEncoder) shiftLow() (err os.Error) {
 	lowHi := uint32(re.low >> 32)
 
-	fmt.Printf("[0] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d\n",
-		re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi)
+	//fmt.Printf("[0] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d\n",
+	//	re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi)
 
-	if re.low == 4449935872 {
-		panic("re.low is 4449935872")
-	}
+	//if re.low == 4449935872 {
+	//	panic("re.low is 4449935872")
+	//}
 
 	if lowHi != 0 || re.low < uint64(0xff000000) {
 		re.pos += uint64(re.cacheSize)
@@ -186,8 +186,8 @@ func (re *rangeEncoder) shiftLow() (err os.Error) {
 				return
 			}
 
-			fmt.Printf("[1] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d, temp = %d, byte = %d\n",
-				re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi, temp, int8(byte(temp+uint32(lowHi))))
+			//fmt.Printf("[1] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d, temp = %d, byte = %d\n",
+			//	re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi, temp, int8(byte(temp+uint32(lowHi))))
 
 			temp = 0xff
 			re.cacheSize--
@@ -198,8 +198,8 @@ func (re *rangeEncoder) shiftLow() (err os.Error) {
 	//re.low = (re.low & uint64(0xffffff)) << 8
 	re.low = uint64(uint32(re.low) << 8)
 
-	fmt.Printf("[2] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d\n",
-		re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi)
+	//fmt.Printf("[2] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d\n",
+	//	re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi)
 
 	return
 }
@@ -230,8 +230,8 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 	prob := probs[index]
 	newBound := int32(uint32(re.rrange)>>kNumBitModelTotalBits) * int32(prob)
 
-	fmt.Printf("[0] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d\n",
-		re.rrange, re.low, prob, index, symbol, newBound)
+	//fmt.Printf("[0] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d\n",
+	//	re.rrange, re.low, prob, index, symbol, newBound)
 	/*
 		if re.rrange == 202631856 && re.low == 6384534567 {
 			panic("re.rrange == 202631856 && re.low == 6384534567")
@@ -246,14 +246,14 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 		probs[index] = prob - prob>>kNumMoveBits
 	}
 
-	fmt.Printf("[1] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d, probs[index] = %d\n",
-		re.rrange, re.low, prob, index, symbol, newBound, probs[index])
+	//fmt.Printf("[1] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d, probs[index] = %d\n",
+	//	re.rrange, re.low, prob, index, symbol, newBound, probs[index])
 
 	if uint32(re.rrange)&kTopMask == 0 {
 		re.rrange <<= 8
 
-		fmt.Printf("[2] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d\n",
-			re.rrange, re.low, prob, index, symbol, newBound)
+		//fmt.Printf("[2] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d\n",
+		//	re.rrange, re.low, prob, index, symbol, newBound)
 
 		err := re.shiftLow()
 		if err != nil {
@@ -316,15 +316,15 @@ func getPrice1(prob uint32) uint32 {
 	return res
 }
 
-func printProbPrices_temp_F() {
+/*func printProbPrices_temp_F() {
 
 	fmt.Printf("[0] printProbPrices_temp_F(): len(pribPrices) = %d\n", len(probPrices))
 	for i := 0; i < len(probPrices); i++ {
 		fmt.Printf("[1] printProbPrices_temp_F(): i = %d, pribPrices[i] = %d\n", i, probPrices[i])
 	}
 
-}
-
+}*/
+/*
 // prob is allways less than max(uint16)
 func getPrice0_temp_F(prob uint32) uint32 {
 	res := probPrices[prob>>kNumMoveReducingBits]
@@ -342,4 +342,4 @@ func getPrice1_temp_F(prob uint32) uint32 {
 		prob, (kBitModelTotal-prob)>>kNumMoveReducingBits, res, kNumMoveReducingBits, kBitModelTotal)
 
 	return res
-}
+}*/

@@ -1,9 +1,6 @@
 package lzma
 
-import (
-	"os"
-	"fmt"
-)
+import "os"
 
 type rangeBitTreeCoder struct {
 	models       []uint16 // length(models) is at most 1<<8
@@ -75,8 +72,8 @@ func (rc *rangeBitTreeCoder) encode(re *rangeEncoder, symbol uint32) (err os.Err
 		}
 		m = (m << 1) | bit
 
-		fmt.Printf("[0] rc.encode(): symbol = %d, bitIndex = %d, m = %d, bit = %d, rc.numBitLevels = %d\n",
-			symbol, bitIndex, m, bit, rc.numBitLevels)
+		//fmt.Printf("[0] rc.encode(): symbol = %d, bitIndex = %d, m = %d, bit = %d, rc.numBitLevels = %d\n",
+		//	symbol, bitIndex, m, bit, rc.numBitLevels)
 
 	}
 	return
