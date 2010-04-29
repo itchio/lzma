@@ -233,8 +233,8 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 	fmt.Printf("[0] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d\n",
 		re.rrange, re.low, prob, index, symbol, newBound)
 	/*
-		if re.rrange == 98647040 && prob == 1206 {
-			panic("re.rrange == 98647040 && prob == 1206")
+		if re.rrange == 202631856 && re.low == 6384534567 {
+			panic("re.rrange == 202631856 && re.low == 6384534567")
 		}
 	*/
 	if symbol == 0 {

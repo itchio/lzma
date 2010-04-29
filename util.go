@@ -34,3 +34,5 @@ func maxUInt32(left uint32, right uint32) uint32 {
 var navn bool = false
 var p67 bool = false
 var zr198 int = 0
+var b57 bool = false
+var count57 int = 0

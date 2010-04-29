@@ -183,7 +183,11 @@ func (pc *lenPriceTableCoder) encode(re *rangeEncoder, symbol, posState uint32) 
 	if err != nil {
 		return
 	}
-	if pc.counters[posState]-1 == 0 {
+	pc.counters[posState]--
+	if pc.counters[posState] == 0 {
+
+		fmt.Printf("[0] pc.encode(): symbol = %d, posState = %d\n", symbol, posState)
+
 		pc.updateTable(posState)
 	}
 	return

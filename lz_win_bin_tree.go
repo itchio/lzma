@@ -182,7 +182,7 @@ func (iw *lzInWindow) getIndexByte(index int32) byte {
 	res := iw.buf[int32(iw.bufOffset+iw.pos)+index]
 
 	fmt.Printf("[0] iw.getIndexByte(): index = %d, len(iw.buf) = %d, iw.bufOffset = %d, iw.pos = %d, theIndex = %d, res = %d\n",
-		index, len(iw.buf), int32(iw.bufOffset), iw.pos, int32(iw.bufOffset+iw.pos)+index, res)
+		index, len(iw.buf), int32(iw.bufOffset), iw.pos, int32(iw.bufOffset+iw.pos)+index, int8(res))
 
 	return res
 }
