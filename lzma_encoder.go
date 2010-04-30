@@ -69,12 +69,12 @@ var levels = []*compressionLevel{
 	&compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
 	&compressionLevel{18, 64, 3, 0, 2, "bt4"},  // 2
 	&compressionLevel{20, 64, 3, 0, 2, "bt4"},  // 3
-	&compressionLevel{22, 64, 3, 0, 2, "bt4"},  // 4
+	&compressionLevel{22, 128, 3, 0, 2, "bt4"}, // 4
 	&compressionLevel{23, 128, 3, 0, 2, "bt4"}, // 5
 	&compressionLevel{24, 128, 3, 0, 2, "bt4"}, // 6
-	&compressionLevel{25, 128, 3, 0, 2, "bt4"}, // 7
-	&compressionLevel{26, 255, 3, 0, 2, "bt4"}, // 8
-	&compressionLevel{27, 255, 3, 0, 2, "bt4"}, // 9
+	&compressionLevel{25, 256, 3, 0, 2, "bt4"}, // 7
+	&compressionLevel{26, 256, 3, 0, 2, "bt4"}, // 8
+	&compressionLevel{27, 256, 3, 0, 2, "bt4"}, // 9
 }
 
 func (cl *compressionLevel) checkValues() os.Error {
