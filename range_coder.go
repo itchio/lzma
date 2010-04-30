@@ -32,35 +32,34 @@ func makeReader(r io.Reader) Reader {
 	return bufio.NewReader(r)
 }
 
-func newRangeDecoder(r io.Reader) (rd *rangeDecoder, err os.Error) {
-	rd = &rangeDecoder{r: makeReader(r)}
+func newRangeDecoder(r io.Reader) *rangeDecoder {
+	rd := &rangeDecoder{r: makeReader(r)}
 	rd.rrange = -1
 	rd.code = 0
 	buf := make([]byte, 5)
-	n, err := rd.r.Read(buf)
+	n, err := rd.r.Read(buf) // ERR - panic
 	if err != nil {
-		return
+		error(err) // panic, will recover from it in the upper-most level
 	}
 	if n != len(buf) {
-		err = os.NewError("expected " + string(len(buf)) + " bytes, read " + string(n) + " bytes instead")
-		return
+		error(nReadError) // panic, will recover from it in the upper-most level
 	}
 	for i := 0; i < len(buf); i++ {
 		rd.code = rd.code<<8 | int32(buf[i])
 	}
-	return
+	return rd
 }
 
-func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err os.Error) {
+func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32) {
 	for i := numTotalBits; i != 0; i-- {
 		rd.rrange = int32(uint32(rd.rrange) >> 1)
 		t := int32(uint32(rd.code-rd.rrange) >> 31)
 		rd.code -= rd.rrange & (t - 1)
 		res = (res << 1) | uint32(1-t)
 		if (uint32(rd.rrange) & kTopMask) == 0 {
-			c, err := rd.r.ReadByte()
+			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
-				return
+				error(err) // panic, will recover from it in the upper-most level
 			}
 			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange = rd.rrange << 8
@@ -69,16 +68,16 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32, err o
 	return
 }
 
-func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err os.Error) {
+func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 	prob := probs[index]
 	newBound := int32(uint32(rd.rrange)>>kNumBitModelTotalBits) * int32(prob)
 	if rd.code^int32(-1<<31) < newBound^int32(-1<<31) {
 		rd.rrange = newBound
 		probs[index] = prob + (uint16(kBitModelTotal)-prob)>>kNumMoveBits
 		if (uint32(rd.rrange) & kTopMask) == 0 {
-			c, err := rd.r.ReadByte()
+			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
-				return
+				error(err) // panic, will recover from it in the upper-most level
 			}
 			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange = rd.rrange << 8
@@ -89,9 +88,9 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32, err
 		rd.code -= newBound
 		probs[index] = prob - prob>>kNumMoveBits
 		if (uint32(rd.rrange) & kTopMask) == 0 {
-			c, err := rd.r.ReadByte()
+			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
-				return
+				error(err) // panic, will recover from it in the upper-most level
 			}
 			rd.code = (rd.code << 8) | int32(c)
 			rd.rrange <<= 8
@@ -152,18 +151,17 @@ func newRangeEncoder(w io.Writer) *rangeEncoder {
 	}
 }
 
-func (re *rangeEncoder) flush() (err os.Error) {
+func (re *rangeEncoder) flush() {
 	for i := 0; i < 5; i++ {
-		err = re.shiftLow()
-		if err != nil {
-			return
-		}
+		re.shiftLow()
 	}
-	err = re.w.Flush()
-	return
+	err := re.w.Flush() // ERR - panic
+	if err != nil {
+		error(err) // panic, will recover from it in the upper-most level
+	}
 }
 
-func (re *rangeEncoder) shiftLow() (err os.Error) {
+func (re *rangeEncoder) shiftLow() {
 	lowHi := uint32(re.low >> 32)
 
 	//fmt.Printf("[0] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d\n",
@@ -178,9 +176,9 @@ func (re *rangeEncoder) shiftLow() (err os.Error) {
 		temp := re.cache
 		dwtemp := uint32(1) // do-while tmp var, execute the loop at least once
 		for ; dwtemp != 0; dwtemp = re.cacheSize {
-			err := re.w.WriteByte(byte(temp + uint32(lowHi)))
+			err := re.w.WriteByte(byte(temp + uint32(lowHi))) // ERR - panic
 			if err != nil {
-				return
+				error(err) // panic, will recover from it in the upper-most level
 			}
 
 			//fmt.Printf("[1] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d, temp = %d, byte = %d\n",
@@ -198,10 +196,9 @@ func (re *rangeEncoder) shiftLow() (err os.Error) {
 	//fmt.Printf("[2] re.shiftLow(): re.low = %d, re.pos = %d, re.cacheSize = %d, re.cache = %d, re.rrange = %d, lowHi = %d\n",
 	//	re.low, re.pos, re.cacheSize, re.cache, re.rrange, lowHi)
 
-	return
 }
 
-func (re *rangeEncoder) encodeDirectBits(v, numTotalBits int32) (err os.Error) {
+func (re *rangeEncoder) encodeDirectBits(v, numTotalBits int32) {
 	for i := numTotalBits - 1; i >= 0; i-- {
 		re.rrange = int32(uint32(re.rrange) >> 1)
 		if (uint32(v)>>uint32(i))&1 == 1 {
@@ -210,20 +207,16 @@ func (re *rangeEncoder) encodeDirectBits(v, numTotalBits int32) (err os.Error) {
 		}
 		if uint32(re.rrange)&kTopMask == 0 {
 			re.rrange <<= 8
-			err := re.shiftLow()
-			if err != nil {
-				return
-			}
+			re.shiftLow()
 		}
 	}
-	return
 }
 
 func (re *rangeEncoder) processedSize() uint64 {
 	return uint64(re.cacheSize) + re.pos + 4
 }
 
-func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Error) {
+func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) {
 	prob := probs[index]
 	newBound := int32(uint32(re.rrange)>>kNumBitModelTotalBits) * int32(prob)
 
@@ -252,12 +245,8 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) (err os.Err
 		//fmt.Printf("[2] re.encode(): re.rrange = %d, re.low = %d, prob = %d, index = %d, symbol = %d, newBound = %d\n",
 		//	re.rrange, re.low, prob, index, symbol, newBound)
 
-		err := re.shiftLow()
-		if err != nil {
-			return
-		}
+		re.shiftLow()
 	}
-	return
 }
 
 

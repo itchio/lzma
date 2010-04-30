@@ -1,8 +1,5 @@
 package lzma
 
-import "os"
-//import "fmt"
-
 type litCoder2 struct {
 	coders []uint16
 }
@@ -14,57 +11,44 @@ func newLitCoder2() *litCoder2 {
 }
 
 
-func (lc2 *litCoder2) decodeNormal(rd *rangeDecoder) (b byte, err os.Error) {
+func (lc2 *litCoder2) decodeNormal(rd *rangeDecoder) byte {
 	symbol := uint32(1)
 	for symbol < 0x100 {
-		i, err := rd.decodeBit(lc2.coders, symbol)
-		if err != nil {
-			return
-		}
+		i := rd.decodeBit(lc2.coders, symbol)
 		symbol = symbol<<1 | i
 	}
-	return byte(symbol), nil
+	return byte(symbol)
 }
 
-func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) (b byte, err os.Error) {
+func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) byte {
 	symbol := uint32(1)
 	for symbol < 0x100 {
 		matchBit := uint32((matchByte >> 7) & 1)
 		matchByte = matchByte << 1
-		bit, err := rd.decodeBit(lc2.coders, ((1+matchBit)<<8)+symbol)
-		if err != nil {
-			return
-		}
+		bit := rd.decodeBit(lc2.coders, ((1+matchBit)<<8)+symbol)
 		symbol = (symbol << 1) | bit
 		if matchBit != bit {
 			for symbol < 0x100 {
-				i, err := rd.decodeBit(lc2.coders, symbol)
-				if err != nil {
-					return
-				}
+				i := rd.decodeBit(lc2.coders, symbol)
 				symbol = (symbol << 1) | i
 			}
 			break
 		}
 	}
-	return byte(symbol), nil
+	return byte(symbol)
 }
 
 
-func (lc2 *litCoder2) encode(re *rangeEncoder, symbol byte) (err os.Error) {
+func (lc2 *litCoder2) encode(re *rangeEncoder, symbol byte) {
 	context := uint32(1)
 	for i := 7; i >= 0; i-- {
 		bit := (symbol >> uint8(i)) & 1
-		err = re.encode(lc2.coders, context, uint32(bit))
-		if err != nil {
-			return
-		}
+		re.encode(lc2.coders, context, uint32(bit))
 		context = context<<1 | uint32(bit)
 	}
-	return
 }
 
-func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) (err os.Error) {
+func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) {
 	context := uint32(1)
 	same := true
 	for i := 7; i >= 0; i-- {
@@ -78,13 +62,9 @@ func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) (e
 				same = true
 			}
 		}
-		err = re.encode(lc2.coders, state, uint32(bit))
-		if err != nil {
-			return
-		}
+		re.encode(lc2.coders, state, uint32(bit))
 		context = context<<1 | uint32(bit)
 	}
-	return
 }
 
 func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {

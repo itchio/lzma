@@ -1,8 +1,5 @@
 package lzma
 
-import "os"
-//import "fmt"
-
 type lenCoder struct {
 	choice    []uint16
 	lowCoder  []*rangeBitTreeCoder
@@ -26,32 +23,20 @@ func newLenCoder(numPosStates uint32) *lenCoder {
 
 // ---------------- decode --------------------
 
-func (lc *lenCoder) decode(rd *rangeDecoder, posState uint32) (res uint32, err os.Error) {
-	i, err := rd.decodeBit(lc.choice, 0)
-	if err != nil {
-		return
-	}
+func (lc *lenCoder) decode(rd *rangeDecoder, posState uint32) (res uint32) {
+	i := rd.decodeBit(lc.choice, 0)
 	if i == 0 {
-		res, err = lc.lowCoder[posState].decode(rd)
+		res = lc.lowCoder[posState].decode(rd)
 		return
 	}
 	res = kNumLowLenSymbols
-	j, err := rd.decodeBit(lc.choice, 1)
-	if err != nil {
-		return
-	}
+	j := rd.decodeBit(lc.choice, 1)
 	if j == 0 {
-		k, err := lc.midCoder[posState].decode(rd)
-		if err != nil {
-			return
-		}
+		k := lc.midCoder[posState].decode(rd)
 		res += k
 		return
 	} else {
-		l, err := lc.highCoder.decode(rd)
-		if err != nil {
-			return
-		}
+		l := lc.highCoder.decode(rd)
 		res = res + kNumMidLenSymbols + l
 		return
 	}
@@ -60,43 +45,21 @@ func (lc *lenCoder) decode(rd *rangeDecoder, posState uint32) (res uint32, err o
 
 // ---------------- encode --------------------
 
-func (lc *lenCoder) encode(re *rangeEncoder, symbol, posState uint32) (err os.Error) {
+func (lc *lenCoder) encode(re *rangeEncoder, symbol, posState uint32) {
 	if symbol < kNumLowLenSymbols {
-		err = re.encode(lc.choice, 0, 0)
-		if err != nil {
-			return
-		}
-		err = lc.lowCoder[posState].encode(re, symbol)
-		if err != nil {
-			return
-		}
+		re.encode(lc.choice, 0, 0)
+		lc.lowCoder[posState].encode(re, symbol)
 	} else {
 		symbol -= kNumLowLenSymbols
-		err = re.encode(lc.choice, 0, 1)
-		if err != nil {
-			return
-		}
+		re.encode(lc.choice, 0, 1)
 		if symbol < kNumMidLenSymbols {
-			err = re.encode(lc.choice, 1, 0)
-			if err != nil {
-				return
-			}
-			err = lc.midCoder[posState].encode(re, symbol)
-			if err != nil {
-				return
-			}
+			re.encode(lc.choice, 1, 0)
+			lc.midCoder[posState].encode(re, symbol)
 		} else {
-			err = re.encode(lc.choice, 1, 1)
-			if err != nil {
-				return
-			}
-			err = lc.highCoder.encode(re, symbol-kNumMidLenSymbols)
-			if err != nil {
-				return
-			}
+			re.encode(lc.choice, 1, 1)
+			lc.highCoder.encode(re, symbol-kNumMidLenSymbols)
 		}
 	}
-	return
 }
 
 // write prices into the slice
@@ -180,11 +143,8 @@ func (pc *lenPriceTableCoder) getPrice(symbol, posState uint32) uint32 {
 	return res
 }
 
-func (pc *lenPriceTableCoder) encode(re *rangeEncoder, symbol, posState uint32) (err os.Error) {
-	err = pc.lc.encode(re, symbol, posState)
-	if err != nil {
-		return
-	}
+func (pc *lenPriceTableCoder) encode(re *rangeEncoder, symbol, posState uint32) {
+	pc.lc.encode(re, symbol, posState)
 	pc.counters[posState]--
 	if pc.counters[posState] == 0 {
 
@@ -192,5 +152,4 @@ func (pc *lenPriceTableCoder) encode(re *rangeEncoder, symbol, posState uint32) 
 
 		pc.updateTable(posState)
 	}
-	return
 }

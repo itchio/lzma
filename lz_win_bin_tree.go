@@ -2,7 +2,6 @@ package lzma
 
 import (
 	"io"
-	//"fmt"
 	"os"
 )
 
@@ -24,26 +23,25 @@ func newLzOutWindow(w io.Writer, windowSize uint32) *lzOutWindow {
 	}
 }
 
-func (outWin *lzOutWindow) flush() (err os.Error) {
+func (outWin *lzOutWindow) flush() {
 	size := outWin.pos - outWin.streamPos
 	if size == 0 {
 		return
 	}
-	n, err := outWin.w.Write(outWin.buf[outWin.streamPos : outWin.streamPos+size])
+	n, err := outWin.w.Write(outWin.buf[outWin.streamPos : outWin.streamPos+size]) // ERR - panic
 	if err != nil {
-		return
+		error(err) // panic, will recover from it in the upper-most level
 	}
 	if uint32(n) != size {
-		return os.NewError("expected to write " + string(size) + " bytes, written " + string(n) + " bytes")
+		error(nWriteError) // panic, will recover from it in the upper-most level
 	}
 	if outWin.pos >= outWin.winSize {
 		outWin.pos = 0
 	}
 	outWin.streamPos = outWin.pos
-	return
 }
 
-func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
+func (outWin *lzOutWindow) copyBlock(distance, length uint32) {
 	pos := int32(int32(outWin.pos) - int32(distance) - 1)
 	if pos < 0 {
 		pos += int32(outWin.winSize)
@@ -56,24 +54,17 @@ func (outWin *lzOutWindow) copyBlock(distance, length uint32) (err os.Error) {
 		outWin.pos++
 		pos++
 		if outWin.pos >= outWin.winSize {
-			if err = outWin.flush(); err != nil {
-				return
-			}
+			outWin.flush()
 		}
 	}
-	return
 }
 
-func (outWin *lzOutWindow) putByte(b byte) (err os.Error) {
+func (outWin *lzOutWindow) putByte(b byte) {
 	outWin.buf[outWin.pos] = b
 	outWin.pos++
 	if outWin.pos >= outWin.winSize {
-		err = outWin.flush()
-		if err != nil {
-			return
-		}
+		outWin.flush()
 	}
-	return
 }
 
 func (outWin *lzOutWindow) getByte(distance uint32) (b byte) {
@@ -103,9 +94,9 @@ type lzInWindow struct {
 	streamEnd      bool
 }
 
-func newLzInWindow(r io.Reader, keepSizeBefore, keepSizeAfter, keepSizeReserv uint32) (iw *lzInWindow, err os.Error) {
+func newLzInWindow(r io.Reader, keepSizeBefore, keepSizeAfter, keepSizeReserv uint32) *lzInWindow {
 	blockSize := keepSizeBefore + keepSizeAfter + keepSizeReserv
-	iw = &lzInWindow{
+	iw := &lzInWindow{
 		r:              r,
 		buf:            make([]byte, blockSize),
 		lastSafePos:    blockSize - keepSizeAfter,
@@ -117,8 +108,8 @@ func newLzInWindow(r io.Reader, keepSizeBefore, keepSizeAfter, keepSizeReserv ui
 		streamPos:      0,
 		streamEnd:      false,
 	}
-	err = iw.readBlock()
-	return
+	iw.readBlock()
+	return iw
 }
 
 func (iw *lzInWindow) moveBlock() {
@@ -133,7 +124,7 @@ func (iw *lzInWindow) moveBlock() {
 	iw.bufOffset -= offset
 }
 
-func (iw *lzInWindow) readBlock() (err os.Error) {
+func (iw *lzInWindow) readBlock() {
 	if iw.streamEnd {
 		return
 	}
@@ -141,9 +132,9 @@ func (iw *lzInWindow) readBlock() (err os.Error) {
 		if iw.blockSize-iw.bufOffset-iw.streamPos == 0 {
 			return
 		}
-		n, err := iw.r.Read(iw.buf[iw.bufOffset+iw.streamPos : iw.blockSize])
+		n, err := iw.r.Read(iw.buf[iw.bufOffset+iw.streamPos : iw.blockSize]) // ERR - panic
 		if err != nil && err != os.EOF {
-			return
+			error(err) // panic, will recover from it in upper-most level
 		}
 		if n == 0 && err == os.EOF {
 			iw.posLimit = iw.streamPos
@@ -159,22 +150,17 @@ func (iw *lzInWindow) readBlock() (err os.Error) {
 			iw.posLimit = iw.streamPos - iw.keepSizeAfter
 		}
 	}
-	return
 }
 
-func (iw *lzInWindow) movePos() (err os.Error) {
+func (iw *lzInWindow) movePos() {
 	iw.pos++
 	if iw.pos > iw.posLimit {
 		ptr := iw.bufOffset + iw.pos
 		if ptr > iw.lastSafePos {
 			iw.moveBlock()
 		}
-		err = iw.readBlock()
-		if err != nil {
-			return
-		}
+		iw.readBlock()
 	}
-	return
 }
 
 // signature: c | go | cs (index is a signed int)
@@ -257,12 +243,12 @@ type lzBinTree struct {
 }
 
 // signature: c | go | cs (in cs compressionLevel fields are signed, but for no good reason)
-func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes uint32) (bt *lzBinTree, err os.Error) {
+func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes uint32) *lzBinTree {
 
 	//fmt.Printf("[0] bt.newLzBinTree(): historySize = %d, keepAddBufBefore= %d, matchMaxLen = %d, keepAddBufAfter = %d\n",
 	//	historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter)
 
-	bt = &lzBinTree{
+	bt := &lzBinTree{
 		son:           make([]uint32, (historySize+1)*2),
 		cyclicBufPos:  0,
 		cyclicBufSize: historySize + 1,
@@ -271,10 +257,7 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 	}
 
 	winSizeReserv := (historySize+keepAddBufBefore+matchMaxLen+keepAddBufAfter)/2 + 256
-	bt.iw, err = newLzInWindow(r, historySize+keepAddBufBefore, matchMaxLen+keepAddBufAfter, winSizeReserv)
-	if err != nil {
-		return
-	}
+	bt.iw = newLzInWindow(r, historySize+keepAddBufBefore, matchMaxLen+keepAddBufAfter, winSizeReserv)
 
 	if numHashBytes > 2 {
 		bt.hashArray = true
@@ -311,7 +294,7 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 	}
 
 	bt.iw.reduceOffsets(-1)
-	return
+	return bt
 }
 
 func normalizeLinks(items []uint32, numItems, subValue uint32) {
@@ -333,22 +316,18 @@ func (bt *lzBinTree) normalize() {
 	bt.iw.reduceOffsets(int32(subValue))
 }
 
-func (bt *lzBinTree) movePos() (err os.Error) {
+func (bt *lzBinTree) movePos() {
 	bt.cyclicBufPos++
 	if bt.cyclicBufPos >= bt.cyclicBufSize {
 		bt.cyclicBufPos = 0
 	}
-	err = bt.iw.movePos()
-	if err != nil {
-		return
-	}
+	bt.iw.movePos()
 	if bt.iw.pos == kMaxValForNormalize {
 		bt.normalize()
 	}
-	return
 }
 
-func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
+func (bt *lzBinTree) getMatches(distances []uint32) uint32 {
 	var lenLimit uint32
 
 	//fmt.Printf("[0] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos)
@@ -358,15 +337,12 @@ func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
 	} else {
 		lenLimit = bt.iw.streamPos - bt.iw.pos
 		if lenLimit < bt.kvMinMatchCheck {
-			err = bt.movePos()
-			if err != nil {
-				return
-			}
+			bt.movePos()
 
 			//fmt.Printf("[1] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d, " +
 			//	"result = %d\n", bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck, 0)
 
-			return 0, nil
+			return 0
 		}
 	}
 
@@ -519,15 +495,15 @@ func (bt *lzBinTree) getMatches(distances []uint32) (res uint32, err os.Error) {
 		}
 	}
 
-	err = bt.movePos()
+	bt.movePos()
 
 	//fmt.Printf("[7] z.mf.getMatches(): bt.iw.pos = %d, bt.matchMaxLen = %d, bt.iw.streamPos = %d, lenLimit = %d, bt.kvMinMatchCheck = %d, result = %d\n",
 	//	bt.iw.pos, bt.matchMaxLen, bt.iw.streamPos, lenLimit, bt.kvMinMatchCheck, offset)
 
-	return offset, err
+	return offset
 }
 
-func (bt *lzBinTree) skip(num uint32) (err os.Error) {
+func (bt *lzBinTree) skip(num uint32) {
 	for i := uint32(0); i < num; i++ {
 		var lenLimit uint32
 		if bt.iw.pos+bt.matchMaxLen <= bt.iw.streamPos {
@@ -535,10 +511,7 @@ func (bt *lzBinTree) skip(num uint32) (err os.Error) {
 		} else {
 			lenLimit = bt.iw.streamPos - bt.iw.pos
 			if lenLimit < bt.kvMinMatchCheck {
-				err = bt.movePos()
-				if err != nil {
-					return
-				}
+				bt.movePos()
 				continue
 			}
 		}
@@ -615,13 +588,8 @@ func (bt *lzBinTree) skip(num uint32) (err os.Error) {
 				len0 = length
 			}
 		}
-
-		err = bt.movePos()
-		if err != nil {
-			return
-		}
+		bt.movePos()
 	}
-	return
 }
 
 

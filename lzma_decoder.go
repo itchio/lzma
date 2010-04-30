@@ -52,6 +52,20 @@ const (
 	kMatchMaxLen                    = kMatchMinLen + kNumLenSymbols - 1
 )
 
+
+// A streamError reports the presence of corrupt input stream.
+var streamError os.Error = os.NewError("error in lzma encoded data stream")
+
+// A headerError reports an error in the header of the lzma encoder file.
+var headerError os.Error = os.NewError("error in lzma header")
+
+// A nReadError reports what it's message reads
+var nReadError os.Error = os.NewError("number of bytes returned by Reader.Read() didn't meet expectances")
+
+// A nWriteError reports what it's message reads
+var nWriteError os.Error = os.NewError("number of bytes returned by Writer.Write() didn't meet expectances")
+
+
 func stateUpdateChar(index uint32) uint32 {
 	if index < 4 {
 		return 0
@@ -115,22 +129,21 @@ type props struct {
 	dictSize   uint32
 }
 
-func (p *props) decodeProps(buf []byte) (err os.Error) {
+func (p *props) decodeProps(buf []byte) {
 	d := buf[0]
 	if d > (9 * 5 * 5) {
-		return os.NewError("illegal value of encoded lc, lp, pb byte " + string(d))
+		error(headerError) // panic, will recover later
 	}
 	p.lc = d % 9
 	d /= 9
 	p.pb = d / 5
 	p.lp = d % 5
 	if p.lc > kNumLitContextBitsMax || p.lp > 4 || p.pb > kNumPosStatesBitsMax {
-		return os.NewError("illegal values of lc, lp or pb: " + string(p.lc) + ", " + string(p.lp) + ", " + string(p.pb))
+		error(headerError) // panic, will recover later
 	}
 	for i := 0; i < 4; i++ {
 		p.dictSize += uint32(buf[i+1]&0xff) << uint32(i*8)
 	}
-	return
 }
 
 
@@ -160,7 +173,7 @@ type decoder struct {
 	posStateMask     uint32
 }
 
-func (z *decoder) doDecode() (err os.Error) {
+func (z *decoder) doDecode() {
 	var state uint32 = 0
 	var rep0 int32 = 0
 	var rep1 int32 = 0
@@ -171,54 +184,39 @@ func (z *decoder) doDecode() (err os.Error) {
 
 	for z.unpackSize < 0 || nowPos < z.unpackSize {
 		posState := uint32(nowPos) & z.posStateMask
-		if res, err := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState); err != nil {
-			return
-		} else if res == 0 {
+		res := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState)
+		if res == 0 {
 			lc2 := z.litCoder.getCoder(uint32(nowPos), prevByte)
 			if !stateIsCharState(state) {
-				res, err := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
-				if err != nil {
-					return
-				}
+				res := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
 				prevByte = byte(res)
 			} else {
-				res, err := lc2.decodeNormal(z.rd)
-				if err != nil {
-					return
-				}
+				res := lc2.decodeNormal(z.rd)
 				prevByte = byte(res)
 			}
-			err := z.outWin.putByte(prevByte)
-			if err != nil {
-				return
-			}
+			z.outWin.putByte(prevByte)
 			state = stateUpdateChar(state)
 			nowPos++
 		} else {
 			var length uint32
-			if res, err := z.rd.decodeBit(z.repDecoders, state); err != nil {
-				return
-			} else if res == 1 {
+			res := z.rd.decodeBit(z.repDecoders, state)
+			if res == 1 {
 				length = 0
-				if res, err := z.rd.decodeBit(z.repG0Decoders, state); err != nil {
-					return
-				} else if res == 0 {
-					if res, err := z.rd.decodeBit(z.rep0LongDecoders, state<<kNumPosStatesBitsMax+posState); err != nil {
-						return
-					} else if res == 0 {
+				res := z.rd.decodeBit(z.repG0Decoders, state)
+				if res == 0 {
+					res := z.rd.decodeBit(z.rep0LongDecoders, state<<kNumPosStatesBitsMax+posState)
+					if res == 0 {
 						state = stateUpdateShortRep(state)
 						length = 1
 					}
 				} else {
 					var distance int32
-					if res, err := z.rd.decodeBit(z.repG1Decoders, state); err != nil {
-						return
-					} else if res == 0 {
+					res := z.rd.decodeBit(z.repG1Decoders, state)
+					if res == 0 {
 						distance = rep1
 					} else {
-						if res, err := z.rd.decodeBit(z.repG2Decoders, state); err != nil {
-							return
-						} else if res == 0 {
+						res := z.rd.decodeBit(z.repG2Decoders, state)
+						if res == 0 {
 							distance = rep2
 						} else {
 							distance = rep3
@@ -230,10 +228,7 @@ func (z *decoder) doDecode() (err os.Error) {
 					rep0 = distance
 				}
 				if length == 0 {
-					res, err := z.repLenCoder.decode(z.rd, posState)
-					if err != nil {
-						return
-					}
+					res := z.repLenCoder.decode(z.rd, posState)
 					length = res + kMatchMinLen
 					state = stateUpdateRep(state)
 				}
@@ -241,41 +236,26 @@ func (z *decoder) doDecode() (err os.Error) {
 				rep3 = rep2
 				rep2 = rep1
 				rep1 = rep0
-				res, err := z.lenCoder.decode(z.rd, posState)
-				if err != nil {
-					return
-				}
+				res := z.lenCoder.decode(z.rd, posState)
 				length = res + kMatchMinLen
 				state = stateUpdateMatch(state)
-				posSlot, err := z.posSlotCoders[getLenToPosState(length)].decode(z.rd)
-				if err != nil {
-					return
-				}
+				posSlot := z.posSlotCoders[getLenToPosState(length)].decode(z.rd)
 				if posSlot >= kStartPosModelIndex {
 					numDirectBits := uint32(posSlot>>1 - 1)
 					rep0 = int32((2 | posSlot&1) << numDirectBits)
 					if posSlot < kEndPosModelIndex {
-						res, err := reverseDecodeIndex(z.rd, z.posDecoders, rep0-int32(posSlot)-1, numDirectBits)
-						if err != nil {
-							return
-						}
+						res := reverseDecodeIndex(z.rd, z.posDecoders, rep0-int32(posSlot)-1, numDirectBits)
 						rep0 += int32(res)
 					} else {
-						res, err := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)
-						if err != nil {
-							return
-						}
+						res := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)
 						rep0 += int32(res << kNumAlignBits)
-						res, err = z.posAlignCoder.reverseDecode(z.rd)
-						if err != nil {
-							return
-						}
+						res = z.posAlignCoder.reverseDecode(z.rd)
 						rep0 += int32(res)
 						if rep0 < 0 {
 							if rep0 == -1 {
 								break
 							}
-							return os.NewError("error in data stream (checkpoint 1)")
+							error(streamError) // panic, will recover later
 						}
 					}
 				} else {
@@ -283,50 +263,42 @@ func (z *decoder) doDecode() (err os.Error) {
 				}
 			}
 			if int64(rep0) >= nowPos || rep0 >= int32(z.dictSizeCheck) {
-				return os.NewError("error in data stream (checkpoint 2)")
+				error(streamError) // panic, will recover later
 			}
-			if err := z.outWin.copyBlock(uint32(rep0), length); err != nil {
-				return
-			}
+			z.outWin.copyBlock(uint32(rep0), length)
 			nowPos += int64(length)
 			prevByte = z.outWin.getByte(0)
 		}
 	}
-	if err := z.outWin.flush(); err != nil {
-		return
-	}
-	return nil
+	z.outWin.flush()
 }
 
 func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
+	defer handlePanics(&err)
+
 	// read first 13 bytes from r which contain lc, lp, pb, dictSize and unpackedSize
 	header := make([]byte, lzmaHeaderSize)
-	n, err := r.Read(header)
+	n, err := r.Read(header) // ERR
 	if err != nil {
 		return
 	}
 	if n != lzmaHeaderSize {
-		return os.NewError("read " + string(n) + " bytes instead of " + string(lzmaHeaderSize))
+		return nReadError
 	}
 	z.prop = &props{}
-	if err = z.prop.decodeProps(header); err != nil {
-		return
-	}
+	z.prop.decodeProps(header)
 
 	z.unpackSize = 0
 	for i := 0; i < 8; i++ {
 		b := header[lzmaPropSize+i]
 		if int32(b) < 0 {
-			return os.NewError("can't read stream size")
+			return headerError
 		}
 		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
 	}
 
 	// do not move the initialization of z.rd before that of z.prop and z.unpackSize
-	z.rd, err = newRangeDecoder(r)
-	if err != nil {
-		return
-	}
+	z.rd = newRangeDecoder(r)
 
 	if z.prop.dictSize >= 1 {
 		z.dictSizeCheck = z.prop.dictSize
@@ -355,10 +327,13 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	}
 	z.posAlignCoder = newRangeBitTreeCoder(kNumAlignBits)
 
-	err = z.doDecode()
+	z.doDecode()
 	return
 }
 
+// NewDecoder returns a new ReadCloser that can be used to read the uncompressed
+// version of r. It is the caller's responsibility to call Close on the ReadCloser
+// when finished reading.
 func NewDecoder(r io.Reader) io.ReadCloser {
 	var z decoder
 	pr, pw := io.Pipe()
