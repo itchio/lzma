@@ -1081,8 +1081,10 @@ DoWhile1:
 	return
 }
 
+var tempPrices []uint32 = make([]uint32, kNumFullDistances)
+
 func (z *encoder) fillDistancesPrices() {
-	tempPrices := make([]uint32, kNumFullDistances)
+	//tempPrices := make([]uint32, kNumFullDistances) // leaks memory
 	for i := uint32(kStartPosModelIndex); i < kNumFullDistances; i++ {
 		posSlot := getPosSlot(i)
 		footerBits := posSlot>>1 - 1
