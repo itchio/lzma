@@ -60,10 +60,10 @@ func (lc *lenCoder) encode(re *rangeEncoder, symbol, posState uint32) {
 
 // write prices into the prices slice
 func (lc *lenCoder) setPrices(prices []uint32, posState, numSymbols, st uint32) {
-	a0 := getPrice0(uint32(lc.choice[0]))
-	a1 := getPrice1(uint32(lc.choice[0]))
-	b0 := a1 + getPrice0(uint32(lc.choice[1]))
-	b1 := a1 + getPrice1(uint32(lc.choice[1]))
+	a0 := getPrice0(lc.choice[0])
+	a1 := getPrice1(lc.choice[0])
+	b0 := a1 + getPrice0(lc.choice[1])
+	b1 := a1 + getPrice1(lc.choice[1])
 
 	var i uint32
 	for i = 0; i < kNumLowLenSymbols; i++ {

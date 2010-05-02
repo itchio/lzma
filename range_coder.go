@@ -9,7 +9,7 @@ import (
 const (
 	kTopMask              uint32 = 0xff000000
 	kNumBitModelTotalBits uint32 = 11
-	kBitModelTotal        uint32 = 1 << kNumBitModelTotalBits
+	kBitModelTotal        uint16 = 1 << kNumBitModelTotalBits
 	kNumMoveBits          uint32 = 5
 )
 
@@ -72,7 +72,7 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 	newBound := int32(uint32(rd.rrange)>>kNumBitModelTotalBits) * int32(prob)
 	if rd.code^int32(-1<<31) < newBound^int32(-1<<31) {
 		rd.rrange = newBound
-		probs[index] = prob + (uint16(kBitModelTotal)-prob)>>kNumMoveBits
+		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
 		if (uint32(rd.rrange) & kTopMask) == 0 {
 			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
@@ -101,7 +101,7 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 
 func initBitModels(length uint32) (probs []uint16) {
 	probs = make([]uint16, int(length))
-	val := uint16(kBitModelTotal >> 1)
+	val := kBitModelTotal >> 1
 	for i := uint32(0); i < length; i++ {
 		probs[i] = val
 	}
@@ -199,7 +199,7 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) {
 	newBound := int32(uint32(re.rrange)>>kNumBitModelTotalBits) * int32(prob)
 	if symbol == 0 {
 		re.rrange = newBound
-		probs[index] = prob + (uint16(kBitModelTotal)-prob)>>kNumMoveBits
+		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
 	} else {
 		re.low += uint64(newBound) & uint64(0xffffffff)
 		re.rrange -= newBound
@@ -226,14 +226,16 @@ func initProbPrices() {
 	}
 }
 
-func getPrice(prob, symbol uint32) uint32 {
-	return probPrices[uint32(((prob-symbol)^(-symbol))&(kBitModelTotal-1))>>kNumMoveReducingBits]
+// prob and symbol fit in uint16s. prob is always some element of a []uin16. symbol is usualy an uint32.
+// Therefore, in order to save a lot of type conversions, prob must be uint16 and symbol uint32
+func getPrice(prob uint16, symbol uint32) uint32 {
+	return probPrices[(((uint32(prob)-symbol)^(-symbol))&(uint32(kBitModelTotal)-1))>>kNumMoveReducingBits]
 }
 
-func getPrice0(prob uint32) uint32 {
+func getPrice0(prob uint16) uint32 {
 	return probPrices[prob>>kNumMoveReducingBits]
 }
 
-func getPrice1(prob uint32) uint32 {
+func getPrice1(prob uint16) uint32 {
 	return probPrices[(kBitModelTotal-prob)>>kNumMoveReducingBits]
 }

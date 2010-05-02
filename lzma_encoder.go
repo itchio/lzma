@@ -21,6 +21,8 @@ type osError struct {
 	os.Error
 }
 
+
+// TODO: implement this err
 // A DataIntegrityError reports an error encountered while cheching data integrity.
 // -- from lzma.txt:
 // You can use multiple checks to test data integrity after full decompression:
@@ -312,15 +314,15 @@ func (z *encoder) movePos(num uint32) {
 // signature: c | go | cs
 func (z *encoder) getPureRepPrice(repIndex, state, posState uint32) (price uint32) {
 	if repIndex == 0 {
-		price = getPrice0(uint32(z.isRepG0[state]))
-		price += getPrice1(uint32(z.isRep0Long[state<<kNumPosStatesBitsMax+posState]))
+		price = getPrice0(z.isRepG0[state])
+		price += getPrice1(z.isRep0Long[state<<kNumPosStatesBitsMax+posState])
 	} else {
-		price = getPrice1(uint32(z.isRepG0[state]))
+		price = getPrice1(z.isRepG0[state])
 		if repIndex == 1 {
-			price += getPrice0(uint32(z.isRepG1[state]))
+			price += getPrice0(z.isRepG1[state])
 		} else {
-			price += getPrice1(uint32(z.isRepG1[state]))
-			price += getPrice(uint32(z.isRepG2[state]), repIndex-2)
+			price += getPrice1(z.isRepG1[state])
+			price += getPrice(z.isRepG2[state], repIndex-2)
 		}
 	}
 	return
@@ -347,8 +349,7 @@ func (z *encoder) getPosLenPrice(pos, length, posState uint32) (price uint32) {
 
 // signature: c | go | cs
 func (z *encoder) getRepLen1Price(state, posState uint32) uint32 {
-	return getPrice0(uint32(z.isRepG0[state])) +
-		getPrice0(uint32(z.isRep0Long[state<<kNumPosStatesBitsMax+posState]))
+	return getPrice0(z.isRepG0[state]) + getPrice0(z.isRep0Long[state<<kNumPosStatesBitsMax+posState])
 }
 
 // signature: c | go | cs
@@ -443,12 +444,12 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 
 	z.optimum[0].state = z.state
 	posState := position & z.posStateMask
-	z.optimum[1].price = getPrice0(uint32(z.isMatch[z.state<<kNumPosStatesBitsMax+posState])) +
+	z.optimum[1].price = getPrice0(z.isMatch[z.state<<kNumPosStatesBitsMax+posState]) +
 		z.litCoder.getCoder(position, z.prevByte).getPrice(!stateIsCharState(z.state), matchByte, curByte)
 	z.optimum[1].makeAsChar()
 
-	matchPrice := getPrice1(uint32(z.isMatch[z.state<<kNumPosStatesBitsMax+posState]))
-	repMatchPrice := matchPrice + getPrice1(uint32(z.isRep[z.state]))
+	matchPrice := getPrice1(z.isMatch[z.state<<kNumPosStatesBitsMax+posState])
+	repMatchPrice := matchPrice + getPrice1(z.isRep[z.state])
 	if matchByte == curByte {
 		shortRepPrice := repMatchPrice + z.getRepLen1Price(z.state, posState)
 		if shortRepPrice < z.optimum[1].price {
@@ -499,7 +500,7 @@ DoWhile1:
 		}
 	}
 
-	normalMatchPrice := matchPrice + getPrice0(uint32(z.isRep[z.state]))
+	normalMatchPrice := matchPrice + getPrice0(z.isRep[z.state])
 	length = 2
 	if z.repLens[0] >= 2 {
 		length = z.repLens[0] + 1
@@ -623,7 +624,7 @@ DoWhile1:
 		curByte = z.mf.iw.getIndexByte(0 - 1)
 		matchByte = z.mf.iw.getIndexByte(0 - int32(z.reps[0]) - 1 - 1)
 		posState = position & z.posStateMask
-		curAnd1Price := curPrice + getPrice0(uint32(z.isMatch[state<<kNumPosStatesBitsMax+posState])) +
+		curAnd1Price := curPrice + getPrice0(z.isMatch[state<<kNumPosStatesBitsMax+posState]) +
 			z.litCoder.getCoder(position, z.mf.iw.getIndexByte(0-2)).getPrice(!stateIsCharState(state), matchByte, curByte)
 
 		nextOptimum := z.optimum[cur+1]
@@ -635,8 +636,8 @@ DoWhile1:
 			nextIsChar = true
 		}
 
-		matchPrice = curPrice + getPrice1(uint32(z.isMatch[state<<kNumPosStatesBitsMax+posState]))
-		repMatchPrice = matchPrice + getPrice1(uint32(z.isRep[state]))
+		matchPrice = curPrice + getPrice1(z.isMatch[state<<kNumPosStatesBitsMax+posState])
+		repMatchPrice = matchPrice + getPrice1(z.isRep[state])
 		if matchByte == curByte && !(nextOptimum.posPrev < cur && nextOptimum.backPrev == 0) {
 			shortRepPrice := repMatchPrice + z.getRepLen1Price(state, posState)
 			if shortRepPrice <= nextOptimum.price {
@@ -662,8 +663,8 @@ DoWhile1:
 			if lenTest2 >= 2 {
 				state2 := stateUpdateChar(state)
 				posStateNext := (position + 1) & z.posStateMask
-				nextRepMatchPrice := curAnd1Price + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
-					getPrice1(uint32(z.isRep[state2]))
+				nextRepMatchPrice := curAnd1Price + getPrice1(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]) +
+					getPrice1(z.isRep[state2])
 				offset := cur + 1 + lenTest2
 				for lenEnd < offset {
 					lenEnd++
@@ -717,13 +718,13 @@ DoWhile1:
 					state2 := stateUpdateRep(state)
 					posStateNext := (position + lenTest) & z.posStateMask
 					curAndLenCharPrice := repMatchPrice + z.getRepPrice(repIndex, lenTest, state, posState) +
-						getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
+						getPrice0(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]) +
 						z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
 							true, z.mf.iw.getIndexByte(int32(lenTest)-1-(int32(z.reps[repIndex]+1))), z.mf.iw.getIndexByte(int32(lenTest)-1))
 					state2 = stateUpdateChar(state2)
 					posStateNext = (position + lenTest + 1) & z.posStateMask
-					nextMatchPrice := curAndLenCharPrice + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
-					nextRepMatchPrice := nextMatchPrice + getPrice1(uint32(z.isRep[state2]))
+					nextMatchPrice := curAndLenCharPrice + getPrice1(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])
+					nextRepMatchPrice := nextMatchPrice + getPrice1(z.isRep[state2])
 
 					offset := lenTest + 1 + lenTest2
 					for lenEnd < cur+offset {
@@ -754,7 +755,7 @@ DoWhile1:
 			distancePairs += 2
 		}
 		if newLen >= startLen {
-			normalMatchPrice = matchPrice + getPrice0(uint32(z.isRep[state]))
+			normalMatchPrice = matchPrice + getPrice0(z.isRep[state])
 			for lenEnd < cur+newLen {
 				lenEnd++
 				z.optimum[lenEnd].price = kInfinityPrice
@@ -782,15 +783,15 @@ DoWhile1:
 							state2 := stateUpdateMatch(state)
 							posStateNext := (position + lenTest) & z.posStateMask
 							curAndLenCharPrice := curAndLenPrice +
-								getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
+								getPrice0(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]) +
 								z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
 									true, z.mf.iw.getIndexByte(int32(lenTest)-(int32(curBack)+1)-1),
 									z.mf.iw.getIndexByte(int32(lenTest)-1))
 
 							state2 = stateUpdateChar(state2)
 							posStateNext = (position + lenTest + 1) & z.posStateMask
-							nextMatchPrice := curAndLenCharPrice + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
-							nextRepMatchPrice := nextMatchPrice + getPrice1(uint32(z.isRep[state2]))
+							nextMatchPrice := curAndLenCharPrice + getPrice1(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])
+							nextRepMatchPrice := nextMatchPrice + getPrice1(z.isRep[state2])
 							offset := lenTest + 1 + lenTest2
 							for lenEnd < cur+offset {
 								lenEnd++
@@ -827,7 +828,7 @@ func (z *encoder) fillDistancesPrices() {
 		posSlot := getPosSlot(i)
 		footerBits := posSlot>>1 - 1
 		baseVal := (2 | posSlot&1) << footerBits
-		tempPrices[i] = reverseGetPriceIndex(z.posCoders, int32(baseVal)-int32(posSlot)-1, footerBits, i-baseVal)
+		tempPrices[i] = reverseGetPriceIndex(z.posCoders, baseVal-posSlot-1, footerBits, i-baseVal)
 	}
 	for lenToPosState := uint32(0); lenToPosState < kNumLenToPosStates; lenToPosState++ {
 		var posSlot uint32
@@ -965,7 +966,7 @@ func (z *encoder) codeOneBlock() {
 					baseVal := (2 | posSlot&1) << footerBits
 					posReduced := pos - baseVal
 					if posSlot < kEndPosModelIndex {
-						reverseEncodeIndex(z.re, z.posCoders, int32(baseVal)-int32(posSlot)-1, footerBits, uint32(posReduced))
+						reverseEncodeIndex(z.re, z.posCoders, baseVal-posSlot-1, footerBits, uint32(posReduced))
 					} else {
 						z.re.encodeDirectBits(int32(posReduced)>>kNumAlignBits, int32(footerBits)-kNumAlignBits)
 						z.posAlignCoder.reverseEncode(z.re, uint32(posReduced&kAlignMask))
@@ -1049,6 +1050,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 		return nWriteError
 	}
 
+	// do not move before w.Write()
 	z.re = newRangeEncoder(w)
 	mft, err := strconv.Atoui(strings.Split(z.cl.matchFinder, "", 0)[2])
 	if err != nil {

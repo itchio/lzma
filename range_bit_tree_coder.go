@@ -34,11 +34,11 @@ func (rc *rangeBitTreeCoder) reverseDecode(rd *rangeDecoder) (res uint32) {
 	return
 }
 
-func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex int32, numBitModels uint32) (res uint32) {
+func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex, numBitModels uint32) (res uint32) {
 	index := uint32(1)
 	res = 0
 	for bitIndex := uint32(0); bitIndex < numBitModels; bitIndex++ {
-		bit := rd.decodeBit(models, uint32(startIndex+int32(index)))
+		bit := rd.decodeBit(models, startIndex+index)
 		index <<= 1
 		index += bit
 		res = res | (bit << bitIndex)
@@ -72,7 +72,7 @@ func (rc *rangeBitTreeCoder) getPrice(symbol uint32) (res uint32) {
 	for bitIndex := rc.numBitLevels; bitIndex != 0; {
 		bitIndex--
 		bit := (symbol >> bitIndex) & 1
-		res += getPrice(uint32(rc.models[m]), bit)
+		res += getPrice(rc.models[m], bit)
 		m = (m << 1) + bit
 	}
 	return
@@ -84,29 +84,29 @@ func (rc *rangeBitTreeCoder) reverseGetPrice(symbol uint32) (res uint32) {
 	for i := rc.numBitLevels; i != 0; i-- {
 		bit := symbol & 1
 		symbol >>= 1
-		res += getPrice(uint32(rc.models[m]), bit)
+		res += getPrice(rc.models[m], bit)
 		m = (m << 1) | bit
 	}
 	return
 }
 
-func reverseGetPriceIndex(models []uint16, startIndex int32, numBitLevels, symbol uint32) (res uint32) {
+func reverseGetPriceIndex(models []uint16, startIndex, numBitLevels, symbol uint32) (res uint32) {
 	res = 0
 	m := uint32(1)
 	for i := numBitLevels; i != 0; i-- {
 		bit := symbol & 1
 		symbol >>= 1
-		res += getPrice(uint32(models[startIndex+int32(m)]), bit)
+		res += getPrice(models[startIndex+m], bit)
 		m = (m << 1) | bit
 	}
 	return
 }
 
-func reverseEncodeIndex(re *rangeEncoder, models []uint16, startIndex int32, numBitLevels, symbol uint32) {
+func reverseEncodeIndex(re *rangeEncoder, models []uint16, startIndex, numBitLevels, symbol uint32) {
 	m := uint32(1)
 	for i := uint32(0); i < numBitLevels; i++ {
 		bit := symbol & 1
-		re.encode(models, uint32(startIndex+int32(m)), bit)
+		re.encode(models, startIndex+m, bit)
 		m = (m << 1) | bit
 		symbol >>= 1
 	}

@@ -239,7 +239,7 @@ func (z *decoder) doDecode() {
 					numDirectBits := uint32(posSlot>>1 - 1)
 					rep0 = int32((2 | posSlot&1) << numDirectBits)
 					if posSlot < kEndPosModelIndex {
-						res := reverseDecodeIndex(z.rd, z.posDecoders, rep0-int32(posSlot)-1, numDirectBits)
+						res := reverseDecodeIndex(z.rd, z.posDecoders, uint32(rep0)-posSlot-1, numDirectBits)
 						rep0 += int32(res)
 					} else {
 						res := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)

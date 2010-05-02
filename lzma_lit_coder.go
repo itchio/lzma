@@ -40,53 +40,58 @@ func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) byte
 
 
 func (lc2 *litCoder2) encode(re *rangeEncoder, symbol byte) {
+	uSymbol := uint32(symbol)
 	context := uint32(1)
-	for i := 7; i >= 0; i-- {
-		bit := (symbol >> uint8(i)) & 1
-		re.encode(lc2.coders, context, uint32(bit))
-		context = context<<1 | uint32(bit)
+	for i := uint32(7); int32(i) >= 0; i-- {
+		bit := (uSymbol >> i) & 1
+		re.encode(lc2.coders, context, bit)
+		context = context<<1 | bit
 	}
 }
 
 func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) {
+	uMatchByte := uint32(matchByte)
+	uSymbol := uint32(symbol)
 	context := uint32(1)
 	same := true
-	for i := 7; i >= 0; i-- {
-		bit := (symbol >> uint8(i)) & 1
+	for i := uint32(7); int32(i) >= 0; i-- {
+		bit := (uSymbol >> i) & 1
 		state := context
 		if same == true {
-			matchBit := (matchByte >> uint8(i)) & 1
-			state += (1 + uint32(matchBit)) << 8
+			matchBit := (uMatchByte >> i) & 1
+			state += (1 + matchBit) << 8
 			same = false
 			if matchBit == bit {
 				same = true
 			}
 		}
-		re.encode(lc2.coders, state, uint32(bit))
-		context = context<<1 | uint32(bit)
+		re.encode(lc2.coders, state, bit)
+		context = context<<1 | bit
 	}
 }
 
 func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
+	uMatchByte := uint32(matchByte)
+	uSymbol := uint32(symbol)
 	price := uint32(0)
 	context := uint32(1)
-	i := 7
+	i := uint32(7)
 	if matchMode == true {
-		for ; i >= 0; i-- {
-			matchBit := (matchByte >> uint8(i)) & 1
-			bit := (symbol >> uint8(i)) & 1
-			price += getPrice(uint32(lc2.coders[uint32(1+matchBit)<<8+context]), uint32(bit))
-			context = context<<1 | uint32(bit)
+		for ; int32(i) >= 0; i-- {
+			matchBit := (uMatchByte >> i) & 1
+			bit := (uSymbol >> i) & 1
+			price += getPrice(lc2.coders[1+matchBit<<8+context], bit)
+			context = context<<1 | bit
 			if matchBit != bit {
 				i--
 				break
 			}
 		}
 	}
-	for ; i >= 0; i-- {
-		bit := (symbol >> uint8(i)) & 1
-		price += getPrice(uint32(lc2.coders[context]), uint32(bit))
-		context = context<<1 | uint32(bit)
+	for ; int32(i) >= 0; i-- {
+		bit := (uSymbol >> i) & 1
+		price += getPrice(lc2.coders[context], bit)
+		context = context<<1 | bit
 	}
 	return price
 }
@@ -116,6 +121,6 @@ func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
 // TODO: rename getCoder to getSubCoder or subCoder
 // TODO: rename litCoder2 to litSubCoder
 func (lc *litCoder) getCoder(pos uint32, prevByte byte) *litCoder2 {
-	lc2 := lc.coders[((pos&lc.posMask)<<lc.numPrevBits)+uint32((prevByte&0xff)>>(8-lc.numPrevBits))]
+	lc2 := lc.coders[((pos&lc.posMask)<<lc.numPrevBits)+uint32(prevByte>>(8-lc.numPrevBits))]
 	return lc2
 }
