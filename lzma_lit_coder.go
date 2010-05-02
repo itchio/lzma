@@ -21,10 +21,11 @@ func (lc2 *litCoder2) decodeNormal(rd *rangeDecoder) byte {
 }
 
 func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) byte {
+	uMatchByte := uint32(matchByte)
 	symbol := uint32(1)
 	for symbol < 0x100 {
-		matchBit := uint32((matchByte >> 7) & 1)
-		matchByte = matchByte << 1
+		matchBit := (uMatchByte >> 7) & 1
+		uMatchByte <<= 1
 		bit := rd.decodeBit(lc2.coders, ((1+matchBit)<<8)+symbol)
 		symbol = (symbol << 1) | bit
 		if matchBit != bit {
@@ -105,7 +106,7 @@ type litCoder struct {
 }
 
 func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
-	numStates := uint32(1 << (numPrevBits + numPosBits))
+	numStates := uint32(1) << (numPrevBits + numPosBits)
 	lc := &litCoder{
 		coders:      make([]*litCoder2, numStates),
 		numPrevBits: numPrevBits,

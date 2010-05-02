@@ -295,16 +295,9 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	// do not move the initialization of z.rd before that of z.prop and z.unpackSize
 	z.rd = newRangeDecoder(r)
 
-	if z.prop.dictSize >= 1 {
-		z.dictSizeCheck = z.prop.dictSize
-	} else {
-		z.dictSizeCheck = 1
-	}
-	if z.dictSizeCheck >= 1<<12 {
-		z.outWin = newLzOutWindow(w, z.dictSizeCheck)
-	} else {
-		z.outWin = newLzOutWindow(w, 1<<12)
-	}
+	z.dictSizeCheck = maxUInt32(z.prop.dictSize, 1)
+	z.outWin = newLzOutWindow(w, maxUInt32(z.dictSizeCheck, 1<<12))
+
 	z.litCoder = newLitCoder(uint32(z.prop.lp), uint32(z.prop.lc))
 	z.lenCoder = newLenCoder(uint32(1 << z.prop.pb))
 	z.repLenCoder = newLenCoder(uint32(1 << z.prop.pb))

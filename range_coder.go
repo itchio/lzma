@@ -5,12 +5,19 @@ import (
 	"io"
 	"os"
 )
-
+/*
 const (
 	kTopMask              uint32 = 0xff000000
 	kNumBitModelTotalBits uint32 = 11
 	kBitModelTotal        uint16 = 1 << kNumBitModelTotalBits
 	kNumMoveBits          uint32 = 5
+)
+*/
+const (
+	kTopValue             = 1 << 24
+	kNumBitModelTotalBits = 11
+	kBitModelTotal        = 1 << kNumBitModelTotalBits
+	kNumMoveBits          = 5
 )
 
 type Reader interface {
@@ -20,8 +27,8 @@ type Reader interface {
 
 type rangeDecoder struct {
 	r      Reader
-	rrange int32
-	code   int32
+	rrange uint32
+	code   uint32
 }
 
 func makeReader(r io.Reader) Reader {
@@ -33,7 +40,7 @@ func makeReader(r io.Reader) Reader {
 
 func newRangeDecoder(r io.Reader) *rangeDecoder {
 	rd := &rangeDecoder{r: makeReader(r)}
-	rd.rrange = -1
+	rd.rrange = 0xFFFFFFFF
 	rd.code = 0
 	buf := make([]byte, 5)
 	n, err := rd.r.Read(buf) // ERR - panic
@@ -44,23 +51,23 @@ func newRangeDecoder(r io.Reader) *rangeDecoder {
 		error(nReadError) // panic, will recover from it in the upper-most level
 	}
 	for i := 0; i < len(buf); i++ {
-		rd.code = rd.code<<8 | int32(buf[i])
+		rd.code = rd.code<<8 | uint32(buf[i])
 	}
 	return rd
 }
 
 func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32) {
 	for i := numTotalBits; i != 0; i-- {
-		rd.rrange = int32(uint32(rd.rrange) >> 1)
-		t := int32(uint32(rd.code-rd.rrange) >> 31)
+		rd.rrange = rd.rrange >> 1
+		t := (rd.code - rd.rrange) >> 31
 		rd.code -= rd.rrange & (t - 1)
-		res = (res << 1) | uint32(1-t)
-		if (uint32(rd.rrange) & kTopMask) == 0 {
+		res = (res << 1) | (1 - t)
+		if rd.rrange < kTopValue {
 			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | int32(c)
+			rd.code = (rd.code << 8) | uint32(c)
 			rd.rrange = rd.rrange << 8
 		}
 	}
@@ -69,16 +76,16 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32) {
 
 func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 	prob := probs[index]
-	newBound := int32(uint32(rd.rrange)>>kNumBitModelTotalBits) * int32(prob)
-	if rd.code^int32(-1<<31) < newBound^int32(-1<<31) {
+	newBound := (rd.rrange >> kNumBitModelTotalBits) * uint32(prob)
+	if rd.code < newBound {
 		rd.rrange = newBound
 		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
-		if (uint32(rd.rrange) & kTopMask) == 0 {
+		if rd.rrange < kTopValue {
 			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | int32(c)
+			rd.code = (rd.code << 8) | uint32(c)
 			rd.rrange = rd.rrange << 8
 		}
 		res = 0
@@ -86,12 +93,12 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 		rd.rrange -= newBound
 		rd.code -= newBound
 		probs[index] = prob - prob>>kNumMoveBits
-		if (uint32(rd.rrange) & kTopMask) == 0 {
+		if rd.rrange < kTopValue {
 			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | int32(c)
+			rd.code = (rd.code << 8) | uint32(c)
 			rd.rrange <<= 8
 		}
 		res = 1
@@ -100,8 +107,8 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 }
 
 func initBitModels(length uint32) (probs []uint16) {
-	probs = make([]uint16, int(length))
-	val := kBitModelTotal >> 1
+	probs = make([]uint16, length)
+	val := uint16(kBitModelTotal) >> 1
 	for i := uint32(0); i < length; i++ {
 		probs[i] = val
 	}
@@ -110,8 +117,8 @@ func initBitModels(length uint32) (probs []uint16) {
 
 
 const (
-	kNumMoveReducingBits  uint32 = 2
-	kNumBitPriceShiftBits uint32 = 6
+	kNumMoveReducingBits  = 2
+	kNumBitPriceShiftBits = 6
 )
 
 type Writer interface {
@@ -126,7 +133,7 @@ type rangeEncoder struct {
 	pos       uint64
 	cacheSize uint32
 	cache     uint32
-	rrange    int32
+	rrange    uint32
 }
 
 func makeWriter(w io.Writer) Writer {
@@ -140,10 +147,10 @@ func newRangeEncoder(w io.Writer) *rangeEncoder {
 	return &rangeEncoder{
 		w:         makeWriter(w),
 		low:       0,
-		rrange:    -1,
+		pos:       0,
 		cacheSize: 1,
 		cache:     0,
-		pos:       0,
+		rrange:    0xFFFFFFFF,
 	}
 }
 
@@ -164,7 +171,7 @@ func (re *rangeEncoder) shiftLow() {
 		temp := re.cache
 		dwtemp := uint32(1) // do-while tmp var, execute the loop at least once
 		for ; dwtemp != 0; dwtemp = re.cacheSize {
-			err := re.w.WriteByte(byte(temp + uint32(lowHi))) // ERR - panic
+			err := re.w.WriteByte(byte(temp + lowHi)) // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
@@ -177,13 +184,13 @@ func (re *rangeEncoder) shiftLow() {
 	re.low = uint64(uint32(re.low) << 8)
 }
 
-func (re *rangeEncoder) encodeDirectBits(v, numTotalBits int32) {
-	for i := numTotalBits - 1; i >= 0; i-- {
-		re.rrange = int32(uint32(re.rrange) >> 1)
-		if (uint32(v)>>uint32(i))&1 == 1 {
+func (re *rangeEncoder) encodeDirectBits(v, numTotalBits uint32) {
+	for i := numTotalBits - 1; int32(i) >= 0; i-- {
+		re.rrange >>= 1
+		if (v>>i)&1 == 1 {
 			re.low += uint64(re.rrange)
 		}
-		if uint32(re.rrange)&kTopMask == 0 {
+		if re.rrange < kTopValue {
 			re.rrange <<= 8
 			re.shiftLow()
 		}
@@ -196,16 +203,16 @@ func (re *rangeEncoder) processedSize() uint64 {
 
 func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) {
 	prob := probs[index]
-	newBound := int32(uint32(re.rrange)>>kNumBitModelTotalBits) * int32(prob)
+	newBound := (re.rrange >> kNumBitModelTotalBits) * uint32(prob)
 	if symbol == 0 {
 		re.rrange = newBound
 		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
 	} else {
-		re.low += uint64(newBound) & uint64(0xffffffff)
+		re.low += uint64(newBound) & uint64(0xFFFFFFFF)
 		re.rrange -= newBound
 		probs[index] = prob - prob>>kNumMoveBits
 	}
-	if uint32(re.rrange)&kTopMask == 0 {
+	if re.rrange < kTopValue {
 		re.rrange <<= 8
 		re.shiftLow()
 	}
@@ -216,12 +223,12 @@ var probPrices []uint32 = make([]uint32, kBitModelTotal>>kNumMoveReducingBits) /
 
 // should be called in the encoder's contructor.
 func initProbPrices() {
-	kNumBits := kNumBitModelTotalBits - kNumMoveReducingBits
-	for i := int32(kNumBits) - 1; i >= 0; i-- { // i must remain signed
-		start := uint32(1) << (kNumBits - uint32(i) - 1)
-		end := uint32(1) << (kNumBits - uint32(i))
+	kNumBits := uint32(kNumBitModelTotalBits - kNumMoveReducingBits)
+	for i := kNumBits - 1; int32(i) >= 0; i-- {
+		start := uint32(1) << (kNumBits - i - 1)
+		end := uint32(1) << (kNumBits - i)
 		for j := start; j < end; j++ {
-			probPrices[j] = uint32(i)<<kNumBitPriceShiftBits + ((end-j)<<kNumBitPriceShiftBits)>>(kNumBits-uint32(i)-1)
+			probPrices[j] = i<<kNumBitPriceShiftBits + ((end-j)<<kNumBitPriceShiftBits)>>(kNumBits-i-1)
 		}
 	}
 }

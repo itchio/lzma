@@ -871,8 +871,8 @@ func (z *encoder) writeEndMarker(posState uint32) {
 	lenToPosState := getLenToPosState(uint32(length))
 	z.posSlotCoders[lenToPosState].encode(z.re, uint32(posSlot))
 	footerBits := uint32(30)
-	posReduced := 1<<footerBits - 1
-	z.re.encodeDirectBits(int32(posReduced>>kNumAlignBits), int32(footerBits)-kNumAlignBits)
+	posReduced := uint32(1)<<footerBits - 1
+	z.re.encodeDirectBits(posReduced>>kNumAlignBits, footerBits-kNumAlignBits)
 	z.posAlignCoder.reverseEncode(z.re, uint32(posReduced&kAlignMask))
 }
 
@@ -968,7 +968,7 @@ func (z *encoder) codeOneBlock() {
 					if posSlot < kEndPosModelIndex {
 						reverseEncodeIndex(z.re, z.posCoders, baseVal-posSlot-1, footerBits, uint32(posReduced))
 					} else {
-						z.re.encodeDirectBits(int32(posReduced)>>kNumAlignBits, int32(footerBits)-kNumAlignBits)
+						z.re.encodeDirectBits(posReduced>>kNumAlignBits, footerBits-kNumAlignBits)
 						z.posAlignCoder.reverseEncode(z.re, uint32(posReduced&kAlignMask))
 						z.alignPriceCount++
 					}

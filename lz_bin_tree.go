@@ -212,13 +212,7 @@ func (bt *lzBinTree) getMatches(distances []uint32) uint32 {
 			cyclicPos = (bt.cyclicBufPos - delta + bt.cyclicBufSize) << 1
 		}
 		pby1 := bt.iw.bufOffset + curMatch
-		var length uint32
-		if len0 <= len1 {
-			length = len0
-		} else {
-			length = len1
-		}
-
+		length := minUInt32(len0, len1)
 		if bt.iw.buf[pby1+length] == bt.iw.buf[cur+length] {
 			for length++; length != lenLimit; length++ {
 				if bt.iw.buf[pby1+length] != bt.iw.buf[cur+length] {
@@ -309,12 +303,7 @@ func (bt *lzBinTree) skip(num uint32) {
 				cyclicPos = (bt.cyclicBufPos - delta + bt.cyclicBufSize) << 1
 			}
 			pby1 := bt.iw.bufOffset + curMatch
-			var length uint32
-			if len0 <= len1 {
-				length = len0
-			} else {
-				length = len1
-			}
+			length := minUInt32(len0, len1)
 			if bt.iw.buf[pby1+length] == bt.iw.buf[cur+length] {
 				for length++; length != lenLimit; length++ {
 					if bt.iw.buf[pby1+length] != bt.iw.buf[cur+length] {
