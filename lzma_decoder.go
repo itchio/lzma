@@ -137,7 +137,7 @@ func (p *props) decodeProps(buf []byte) {
 		error(headerError) // panic, will recover later
 	}
 	for i := 0; i < 4; i++ {
-		p.dictSize += uint32(buf[i+1]&0xff) << uint32(i*8)
+		p.dictSize += uint32(buf[i+1]) << uint32(i*8)
 	}
 }
 
@@ -170,24 +170,24 @@ type decoder struct {
 
 func (z *decoder) doDecode() {
 	var state uint32 = 0
-	var rep0 int32 = 0
-	var rep1 int32 = 0
-	var rep2 int32 = 0
-	var rep3 int32 = 0
-	var nowPos int64 = 0
+	var rep0 uint32 = 0
+	var rep1 uint32 = 0
+	var rep2 uint32 = 0
+	var rep3 uint32 = 0
+	var nowPos uint64 = 0
 	var prevByte byte = 0
 
-	for z.unpackSize < 0 || nowPos < z.unpackSize {
+	for z.unpackSize < 0 || int64(nowPos) < z.unpackSize {
 		posState := uint32(nowPos) & z.posStateMask
 		res := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState)
 		if res == 0 {
 			lc2 := z.litCoder.getCoder(uint32(nowPos), prevByte)
 			if !stateIsCharState(state) {
-				res := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(uint32(rep0)))
-				prevByte = byte(res)
+				res := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(rep0))
+				prevByte = res
 			} else {
 				res := lc2.decodeNormal(z.rd)
-				prevByte = byte(res)
+				prevByte = res
 			}
 			z.outWin.putByte(prevByte)
 			state = stateUpdateChar(state)
@@ -205,7 +205,7 @@ func (z *decoder) doDecode() {
 						length = 1
 					}
 				} else {
-					var distance int32
+					var distance uint32
 					res := z.rd.decodeBit(z.repG1Decoders, state)
 					if res == 0 {
 						distance = rep1
@@ -236,32 +236,32 @@ func (z *decoder) doDecode() {
 				state = stateUpdateMatch(state)
 				posSlot := z.posSlotCoders[getLenToPosState(length)].decode(z.rd)
 				if posSlot >= kStartPosModelIndex {
-					numDirectBits := uint32(posSlot>>1 - 1)
-					rep0 = int32((2 | posSlot&1) << numDirectBits)
+					numDirectBits := posSlot>>1 - 1
+					rep0 = (2 | posSlot&1) << numDirectBits
 					if posSlot < kEndPosModelIndex {
-						res := reverseDecodeIndex(z.rd, z.posDecoders, uint32(rep0)-posSlot-1, numDirectBits)
-						rep0 += int32(res)
+						res := reverseDecodeIndex(z.rd, z.posDecoders, rep0-posSlot-1, numDirectBits)
+						rep0 += res
 					} else {
 						res := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)
-						rep0 += int32(res << kNumAlignBits)
+						rep0 += res << kNumAlignBits
 						res = z.posAlignCoder.reverseDecode(z.rd)
-						rep0 += int32(res)
-						if rep0 < 0 {
-							if rep0 == -1 {
+						rep0 += res
+						if int32(rep0) < 0 {
+							if rep0 == 0xFFFFFFFF {
 								break
 							}
 							error(streamError) // panic, will recover later
 						}
 					}
 				} else {
-					rep0 = int32(posSlot)
+					rep0 = posSlot
 				}
 			}
-			if int64(rep0) >= nowPos || rep0 >= int32(z.dictSizeCheck) {
+			if uint64(rep0) >= nowPos || rep0 >= z.dictSizeCheck {
 				error(streamError) // panic, will recover later
 			}
-			z.outWin.copyBlock(uint32(rep0), length)
-			nowPos += int64(length)
+			z.outWin.copyBlock(rep0, length)
+			nowPos += uint64(length)
 			prevByte = z.outWin.getByte(0)
 		}
 	}

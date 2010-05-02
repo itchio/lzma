@@ -5,14 +5,7 @@ import (
 	"io"
 	"os"
 )
-/*
-const (
-	kTopMask              uint32 = 0xff000000
-	kNumBitModelTotalBits uint32 = 11
-	kBitModelTotal        uint16 = 1 << kNumBitModelTotalBits
-	kNumMoveBits          uint32 = 5
-)
-*/
+
 const (
 	kTopValue             = 1 << 24
 	kNumBitModelTotalBits = 11
@@ -166,7 +159,7 @@ func (re *rangeEncoder) flush() {
 
 func (re *rangeEncoder) shiftLow() {
 	lowHi := uint32(re.low >> 32)
-	if lowHi != 0 || re.low < uint64(0xff000000) {
+	if lowHi != 0 || re.low < uint64(0xFF000000) {
 		re.pos += uint64(re.cacheSize)
 		temp := re.cache
 		dwtemp := uint32(1) // do-while tmp var, execute the loop at least once
@@ -175,7 +168,7 @@ func (re *rangeEncoder) shiftLow() {
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			temp = 0xff
+			temp = 0xFF
 			re.cacheSize--
 		}
 		re.cache = uint32(re.low) >> 24

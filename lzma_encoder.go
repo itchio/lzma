@@ -218,7 +218,7 @@ func (o *optimal) isShortRep() bool {
 const (
 	eMatchFinderTypeBT2  = 0
 	eMatchFinderTypeBT4  = 1
-	kInfinityPrice       = 0xFFFFFFF
+	kInfinityPrice       = 0x0FFFFFFF
 	kDefaultDicLogSize   = 22
 	kNumFastBytesDefault = 0x20
 	kNumLenSpecSymbols   = kNumLowLenSymbols + kNumMidLenSymbols

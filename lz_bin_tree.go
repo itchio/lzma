@@ -61,7 +61,7 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 		hs |= hs >> 4
 		hs |= hs >> 8
 		hs >>= 1
-		hs |= 0xffff
+		hs |= 0xFFFF
 		if hs > 1<<24 {
 			hs >>= 1
 		}
