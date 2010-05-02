@@ -58,7 +58,7 @@ func (lc *lenCoder) encode(re *rangeEncoder, symbol, posState uint32) {
 	}
 }
 
-// write prices into the prices slice
+// write prices into prices []uint32
 func (lc *lenCoder) setPrices(prices []uint32, posState, numSymbols, st uint32) {
 	a0 := getPrice0(lc.choice[0])
 	a1 := getPrice1(lc.choice[0])

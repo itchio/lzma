@@ -23,7 +23,7 @@ type osError struct {
 
 
 // TODO: implement this err
-// A DataIntegrityError reports an error encountered while cheching data integrity.
+// A dataIntegrityError reports an error encountered while cheching data integrity.
 // -- from lzma.txt:
 // You can use multiple checks to test data integrity after full decompression:
 // 1) Check Result and "status" variable.
@@ -36,7 +36,7 @@ type osError struct {
 //}
 
 
-// An ArgumentValueError reports an error encountered while parsing user provided arguments.
+// An argumentValueError reports an error encountered while parsing user provided arguments.
 type argumentValueError struct {
 	msg string
 	val interface{}
@@ -289,7 +289,6 @@ type encoder struct {
 	backRes uint32
 }
 
-// signature: c | go | cs
 func (z *encoder) readMatchDistances() (lenRes uint32) {
 	lenRes = 0
 	z.distancePairs = z.mf.getMatches(z.matchDistances)
@@ -303,7 +302,6 @@ func (z *encoder) readMatchDistances() (lenRes uint32) {
 	return
 }
 
-// signature: c | go | cs
 func (z *encoder) movePos(num uint32) {
 	if num > 0 {
 		z.additionalOffset += num
@@ -311,7 +309,6 @@ func (z *encoder) movePos(num uint32) {
 	}
 }
 
-// signature: c | go | cs
 func (z *encoder) getPureRepPrice(repIndex, state, posState uint32) (price uint32) {
 	if repIndex == 0 {
 		price = getPrice0(z.isRepG0[state])
@@ -328,14 +325,12 @@ func (z *encoder) getPureRepPrice(repIndex, state, posState uint32) (price uint3
 	return
 }
 
-// signature: c | go | cs
 func (z *encoder) getRepPrice(repIndex, length, state, posState uint32) (price uint32) {
 	price = z.repMatchLenCoder.getPrice(length-kMatchMinLen, posState)
 	price += z.getPureRepPrice(repIndex, state, posState)
 	return
 }
 
-// singature: c | go | cs
 func (z *encoder) getPosLenPrice(pos, length, posState uint32) (price uint32) {
 	lenToPosState := getLenToPosState(length)
 	if pos < kNumFullDistances {
@@ -347,17 +342,15 @@ func (z *encoder) getPosLenPrice(pos, length, posState uint32) (price uint32) {
 	return
 }
 
-// signature: c | go | cs
 func (z *encoder) getRepLen1Price(state, posState uint32) uint32 {
 	return getPrice0(z.isRepG0[state]) + getPrice0(z.isRep0Long[state<<kNumPosStatesBitsMax+posState])
 }
 
-// signature: c | go | cs
 func (z *encoder) backward(cur uint32) uint32 {
 	z.optimumEndIndex = cur
 	posMem := z.optimum[cur].posPrev
 	backMem := z.optimum[cur].backPrev
-	tmp := uint32(1) // execute loop at least once (do-while)
+	tmp := uint32(1) // execute the loop at least once (do-while)
 	for ; tmp > 0; tmp = cur {
 		if z.optimum[cur].prev1IsChar == true {
 			z.optimum[posMem].makeAsChar()
@@ -877,7 +870,7 @@ func (z *encoder) writeEndMarker(posState uint32) {
 }
 
 func (z *encoder) flush(nowPos uint32) {
-	z.writeEndMarker(uint32(nowPos) & z.posStateMask)
+	z.writeEndMarker(nowPos & z.posStateMask)
 	z.re.flush()
 }
 
@@ -890,7 +883,7 @@ func (z *encoder) codeOneBlock() {
 			return
 		}
 		_ = z.readMatchDistances()
-		z.re.encode(z.isMatch, uint32(z.state<<kNumPosStatesBitsMax)+uint32(z.nowPos)&z.posStateMask, 0)
+		z.re.encode(z.isMatch, z.state<<kNumPosStatesBitsMax+uint32(z.nowPos)&z.posStateMask, 0)
 		z.state = stateUpdateChar(z.state)
 		curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
 		z.litCoder.getCoder(uint32(z.nowPos), z.prevByte).encode(z.re, curByte)
@@ -937,13 +930,13 @@ func (z *encoder) codeOneBlock() {
 						z.re.encode(z.isRepG1, z.state, 0)
 					} else {
 						z.re.encode(z.isRepG1, z.state, 1)
-						z.re.encode(z.isRepG2, z.state, uint32(pos-2))
+						z.re.encode(z.isRepG2, z.state, pos-2)
 					}
 				}
 				if length == 1 {
 					z.state = stateUpdateShortRep(z.state)
 				} else {
-					z.repMatchLenCoder.encode(z.re, uint32(length-kMatchMinLen), posState)
+					z.repMatchLenCoder.encode(z.re, length-kMatchMinLen, posState)
 					z.state = stateUpdateRep(z.state)
 				}
 				distance := z.repDistances[pos]
@@ -956,20 +949,20 @@ func (z *encoder) codeOneBlock() {
 			} else {
 				z.re.encode(z.isRep, z.state, 0)
 				z.state = stateUpdateMatch(z.state)
-				z.lenCoder.encode(z.re, uint32(length-kMatchMinLen), posState)
+				z.lenCoder.encode(z.re, length-kMatchMinLen, posState)
 				pos -= kNumRepDistances
-				posSlot := getPosSlot(uint32(pos))
-				lenToPosState := getLenToPosState(uint32(length))
+				posSlot := getPosSlot(pos)
+				lenToPosState := getLenToPosState(length)
 				z.posSlotCoders[lenToPosState].encode(z.re, posSlot)
 				if posSlot >= kStartPosModelIndex {
 					footerBits := posSlot>>1 - 1
 					baseVal := (2 | posSlot&1) << footerBits
 					posReduced := pos - baseVal
 					if posSlot < kEndPosModelIndex {
-						reverseEncodeIndex(z.re, z.posCoders, baseVal-posSlot-1, footerBits, uint32(posReduced))
+						reverseEncodeIndex(z.re, z.posCoders, baseVal-posSlot-1, footerBits, posReduced)
 					} else {
 						z.re.encodeDirectBits(posReduced>>kNumAlignBits, footerBits-kNumAlignBits)
-						z.posAlignCoder.reverseEncode(z.re, uint32(posReduced&kAlignMask))
+						z.posAlignCoder.reverseEncode(z.re, posReduced&kAlignMask)
 						z.alignPriceCount++
 					}
 				}
@@ -1050,7 +1043,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 		return nWriteError
 	}
 
-	// do not move before w.Write()
+	// do not move before w.Write(header)
 	z.re = newRangeEncoder(w)
 	mft, err := strconv.Atoui(strings.Split(z.cl.matchFinder, "", 0)[2])
 	if err != nil {
@@ -1067,35 +1060,48 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	for i := 0; i < kNumOpts; i++ {
 		z.optimum[i] = &optimal{}
 	}
+
 	z.isMatch = initBitModels(kNumStates << kNumPosStatesBitsMax)
 	z.isRep = initBitModels(kNumStates)
 	z.isRepG0 = initBitModels(kNumStates)
 	z.isRepG1 = initBitModels(kNumStates)
 	z.isRepG2 = initBitModels(kNumStates)
 	z.isRep0Long = initBitModels(kNumStates << kNumPosStatesBitsMax)
+
 	z.posSlotCoders = make([]*rangeBitTreeCoder, kNumLenToPosStates)
 	for i := 0; i < kNumLenToPosStates; i++ {
 		z.posSlotCoders[i] = newRangeBitTreeCoder(kNumPosSlotBits)
 	}
+
 	z.posCoders = initBitModels(kNumFullDistances - kEndPosModelIndex)
 	z.posAlignCoder = newRangeBitTreeCoder(kNumAlignBits)
+
 	z.lenCoder = newLenPriceTableCoder(z.cl.fastBytes+1-kMatchMinLen, 1<<z.cl.posStateBits)
 	z.repMatchLenCoder = newLenPriceTableCoder(z.cl.fastBytes+1-kMatchMinLen, 1<<z.cl.posStateBits)
+
 	z.litCoder = newLitCoder(z.cl.litPosStateBits, z.cl.litContextBits)
+
 	z.matchDistances = make([]uint32, kMatchMaxLen*2+2)
+
 	z.additionalOffset = 0
+
 	z.optimumEndIndex = 0
 	z.optimumCurrentIndex = 0
+
 	z.longestMatchFound = false
+
 	z.posSlotPrices = make([]uint32, 1<<(kNumPosSlotBits+kNumLenToPosStatesBits))
 	z.distancesPrices = make([]uint32, kNumFullDistances<<kNumLenToPosStatesBits)
 	z.alignPrices = make([]uint32, kAlignTableSize)
+
 	z.posStateMask = 1<<z.cl.posStateBits - 1
+
 	z.nowPos = 0
 	z.finished = false
 
 	z.state = 0
 	z.prevByte = 0
+
 	z.repDistances = make([]uint32, kNumRepDistances)
 	for i := 0; i < kNumRepDistances; i++ {
 		z.repDistances[i] = 0
@@ -1121,7 +1127,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // BestCompression.
 //
 // size and level (the lzma header) are written to w before any compressed data.
-// If size is -1, a marker of 6 bytes will be written at the end of the stream.
+// If size is -1, a marker of 6 bytes is written at the end of the stream.
 //
 func NewEncoderSizeLevel(w io.Writer, size int64, level int) (pwc io.WriteCloser) {
 	var z encoder

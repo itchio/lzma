@@ -2,7 +2,7 @@ package lzma
 
 type rangeBitTreeCoder struct {
 	models       []uint16 // length(models) is at most 1<<8
-	numBitLevels uint32   // max 8 (between 2 or 3 and 8); sould it be a uint8 ?
+	numBitLevels uint32   // max 8 (between 2 and 8); sould it be a uint8 ?
 }
 
 func newRangeBitTreeCoder(numBitLevels uint32) *rangeBitTreeCoder {

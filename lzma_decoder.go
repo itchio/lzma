@@ -292,7 +292,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
 	}
 
-	// do not move the initialization of z.rd before that of z.prop and z.unpackSize
+	// do not move before r.Read(header)
 	z.rd = newRangeDecoder(r)
 
 	z.dictSizeCheck = maxUInt32(z.prop.dictSize, 1)

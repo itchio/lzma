@@ -13,6 +13,8 @@ const (
 	kNumMoveBits          = 5
 )
 
+// The actual read interface needed by NewDecoder. If the passed in io.Reader
+// does not also have ReadByte, the NewDecoder will introduce its own buffering.
 type Reader interface {
 	io.Reader
 	ReadByte() (c byte, err os.Error)
@@ -114,6 +116,9 @@ const (
 	kNumBitPriceShiftBits = 6
 )
 
+// The actual write interface needed by NewEncoder. If the passed in io.Writer
+// does not also have WriteByte and Flush, the NewEncoder will introduce its
+// own buffering.
 type Writer interface {
 	io.Writer
 	Flush() os.Error
@@ -162,7 +167,7 @@ func (re *rangeEncoder) shiftLow() {
 	if lowHi != 0 || re.low < uint64(0xFF000000) {
 		re.pos += uint64(re.cacheSize)
 		temp := re.cache
-		dwtemp := uint32(1) // do-while tmp var, execute the loop at least once
+		dwtemp := uint32(1) // execute the loop at least once (do-while)
 		for ; dwtemp != 0; dwtemp = re.cacheSize {
 			err := re.w.WriteByte(byte(temp + lowHi)) // ERR - panic
 			if err != nil {
@@ -226,8 +231,6 @@ func initProbPrices() {
 	}
 }
 
-// prob and symbol fit in uint16s. prob is always some element of a []uin16. symbol is usualy an uint32.
-// Therefore, in order to save a lot of type conversions, prob must be uint16 and symbol uint32
 func getPrice(prob uint16, symbol uint32) uint32 {
 	return probPrices[(((uint32(prob)-symbol)^(-symbol))&(uint32(kBitModelTotal)-1))>>kNumMoveReducingBits]
 }

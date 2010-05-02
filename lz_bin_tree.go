@@ -28,7 +28,6 @@ type lzBinTree struct {
 	hashArray            bool
 }
 
-// signature: c | go | cs (in cs compressionLevel fields are signed, but for no good reason)
 func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes uint32) *lzBinTree {
 	bt := &lzBinTree{
 		son:           make([]uint32, (historySize+1)*2),
@@ -75,7 +74,7 @@ func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepA
 		bt.hash[i] = kEmptyHashValue
 	}
 
-	bt.iw.reduceOffsets(-1)
+	bt.iw.reduceOffsets(0xFFFFFFFF)
 	return bt
 }
 
@@ -95,7 +94,7 @@ func (bt *lzBinTree) normalize() {
 	subValue := bt.iw.pos - bt.cyclicBufSize
 	normalizeLinks(bt.son, bt.cyclicBufSize*2, subValue)
 	normalizeLinks(bt.hash, bt.hashSizeSum, subValue)
-	bt.iw.reduceOffsets(int32(subValue))
+	bt.iw.reduceOffsets(subValue)
 }
 
 func (bt *lzBinTree) movePos() {
