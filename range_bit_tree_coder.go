@@ -12,8 +12,6 @@ func newRangeBitTreeCoder(numBitLevels uint32) *rangeBitTreeCoder {
 	}
 }
 
-// ---------------- decode --------------------
-
 func (rc *rangeBitTreeCoder) decode(rd *rangeDecoder) (res uint32) {
 	res = 1
 	for bitIndex := rc.numBitLevels; bitIndex != 0; bitIndex-- {
@@ -48,8 +46,6 @@ func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex int32, num
 	return
 }
 
-// ---------------- encode --------------------
-
 func (rc *rangeBitTreeCoder) encode(re *rangeEncoder, symbol uint32) {
 	m := uint32(1)
 	for bitIndex := rc.numBitLevels; bitIndex != 0; {
@@ -57,10 +53,6 @@ func (rc *rangeBitTreeCoder) encode(re *rangeEncoder, symbol uint32) {
 		bit := (symbol >> bitIndex) & 1
 		re.encode(rc.models, m, bit)
 		m = (m << 1) | bit
-
-		//fmt.Printf("[0] rc.encode(): symbol = %d, bitIndex = %d, m = %d, bit = %d, rc.numBitLevels = %d\n",
-		//	symbol, bitIndex, m, bit, rc.numBitLevels)
-
 	}
 }
 

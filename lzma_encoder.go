@@ -212,16 +212,6 @@ func (o *optimal) isShortRep() bool {
 	return false
 }
 
-//func (o *optimal) str1() string {
-//	return fmt.Sprintf("o.state = %d, o.posPrev2 = %d, o.backPrev2 = %d, o.price = %d, o.posPrev = %d, o.backPrev = %d",
-//		o.state, o.posPrev2, o.backPrev2, o.price, o.posPrev, int32(o.backPrev))
-//}
-
-//func (o *optimal) str2() string {
-//	return fmt.Sprintf("o.backs0 = %d, o.backs1 = %d, o.backs2 = %d, o.backs3 = %d, o.prev1IsChar = %t, o.prev2 = %t",
-//		o.backs0, o.backs1, o.backs2, o.backs3, o.prev1IsChar, o.prev2)
-//}
-
 
 const (
 	eMatchFinderTypeBT2  = 0
@@ -301,15 +291,6 @@ type encoder struct {
 func (z *encoder) readMatchDistances() (lenRes uint32) {
 	lenRes = 0
 	z.distancePairs = z.mf.getMatches(z.matchDistances)
-
-	//fmt.Printf("[0] z.readMatchDistances(): z.distancePairs = %d\n", z.distancePairs)
-	/*
-		zr198++
-		if zr198 == 198 {
-			panic("zr is 198")
-		}
-	*/
-
 	if z.distancePairs > 0 {
 		lenRes = z.matchDistances[z.distancePairs-2]
 		if lenRes == z.cl.fastBytes {
@@ -349,9 +330,6 @@ func (z *encoder) getPureRepPrice(repIndex, state, posState uint32) (price uint3
 func (z *encoder) getRepPrice(repIndex, length, state, posState uint32) (price uint32) {
 	price = z.repMatchLenCoder.getPrice(length-kMatchMinLen, posState)
 	price += z.getPureRepPrice(repIndex, state, posState)
-
-	//fmt.Printf("[0] z.getRepPrice(): repIndex = %d, length = %d, state = %d, posState = %d, price = %d\n", repIndex, length, state, posState, price)
-
 	return
 }
 
@@ -360,30 +338,10 @@ func (z *encoder) getPosLenPrice(pos, length, posState uint32) (price uint32) {
 	lenToPosState := getLenToPosState(length)
 	if pos < kNumFullDistances {
 		price = z.distancesPrices[lenToPosState*kNumFullDistances+pos]
-
-		//fmt.Printf("[0] z.getPosLenPrice(): pos = %d, length = %d, posState = %d, price = %d, lenToPosState = %d, kNumFullDistances = %d, index = %d\n",
-		//	pos, length, posState, price, lenToPosState, kNumFullDistances, lenToPosState*kNumFullDistances+pos)
-
 	} else {
 		price = z.posSlotPrices[lenToPosState<<kNumPosSlotBits+getPosSlot2(pos)] + z.alignPrices[pos&kAlignMask]
-
-		//fmt.Printf("[1] z.getPosLenPrice(): pos = %d, length = %d, posState = %d, price = %d, lenToPosState = %d, kNumPosSlotBits = %d, kAlignMask = %d\n",
-		//	pos, length, posState, price, lenToPosState, kNumPosSlotBits, kAlignMask)
-		//fmt.Printf("[2] z.getPosLenPrice(): index1 = %d, index2 = %d, z.posSlotPrices[index1] = %d, z.alignPrices[index2] = %d\n",
-		//	lenToPosState<<kNumPosSlotBits+getPosSlot2(pos), pos&kAlignMask,
-		//	z.posSlotPrices[lenToPosState<<kNumPosSlotBits+getPosSlot2(pos)], z.alignPrices[pos&kAlignMask])
-
 	}
-
-	//fmt.Printf("[3] z.getPosLenPrice(): pos = %d, length = %d, posState = %d, price = %d, lenToPosState = %d\n",
-	//	pos, length, posState, price, lenToPosState)
-	//fmt.Printf("[4] z.getPosLenPrice(): kNumFullDistances = %d, kNumPosSlotBits = %d, kAlignMask = %d, kMatchMinLen = %d\n",
-	//	kNumFullDistances, kNumPosSlotBits, kAlignMask, kMatchMinLen)
-
 	price += z.lenCoder.getPrice(length-kMatchMinLen, posState)
-
-	//fmt.Printf("[5] z.getPosLenPrice(): price = %d\n", price)
-
 	return
 }
 
@@ -398,26 +356,15 @@ func (z *encoder) backward(cur uint32) uint32 {
 	z.optimumEndIndex = cur
 	posMem := z.optimum[cur].posPrev
 	backMem := z.optimum[cur].backPrev
-
-	//fmt.Printf("[0] z.backward(): cur = %d, posMem = %d, backMem = %d\n", cur, int32(posMem), int32(backMem))
-
 	tmp := uint32(1) // execute loop at least once (do-while)
 	for ; tmp > 0; tmp = cur {
 		if z.optimum[cur].prev1IsChar == true {
 			z.optimum[posMem].makeAsChar()
 			z.optimum[posMem].posPrev = posMem - 1
-
-			//fmt.Printf("[1] z.backward(): posMem = %d, z.optimum.[posMem].backPrev = %d, z.optimum[posMem].posPrev = %d\n",
-			//	posMem, int32(z.optimum[posMem].backPrev), z.optimum[posMem].posPrev)
-
 			if z.optimum[cur].prev2 == true {
 				z.optimum[posMem-1].prev1IsChar = false
 				z.optimum[posMem-1].posPrev = z.optimum[cur].posPrev2
 				z.optimum[posMem-1].backPrev = z.optimum[cur].backPrev2
-
-				//fmt.Printf("[2] z.backward(): posMem-1 = %d, z.optimum.[posMem-1].backPrev = %d, z.optimum[posMem-1].posPrev = %d\n",
-				//	posMem-1, z.optimum[posMem-1].backPrev, z.optimum[posMem-1].posPrev)
-
 			}
 		}
 		posPrev := posMem
@@ -427,33 +374,18 @@ func (z *encoder) backward(cur uint32) uint32 {
 		z.optimum[posPrev].backPrev = backCur
 		z.optimum[posPrev].posPrev = cur
 		cur = posPrev
-
-		//fmt.Printf("[3] z.backward(): posPrev = %d, backCur = %d, backMem = %d, posMem = %d, cur = %d\n",
-		//	int32(posPrev), int32(backCur), int32(backMem), int32(posMem), cur)
-
 	}
 	z.backRes = z.optimum[0].backPrev
 	z.optimumCurrentIndex = z.optimum[0].posPrev
-
-	//fmt.Printf("[4] z.backward(): z.backRes = %d, z.optimumCurrentIndex = %d\n", int32(z.backRes), z.optimumCurrentIndex)
-
 	return z.optimumCurrentIndex
 }
 
 func (z *encoder) getOptimum(position uint32) (res uint32) {
-
-	//fmt.Printf("[0] z.getOptimum(): position = %d, z.optimumEndIndex = %d, z.optimumCurrentIndex = %d, z.backRes = %d\n",
-	//	position, z.optimumEndIndex, z.optimumCurrentIndex, int32(z.backRes))
-
 	if z.optimumEndIndex != z.optimumCurrentIndex {
 		lenRes := z.optimum[z.optimumCurrentIndex].posPrev - z.optimumCurrentIndex
 		z.backRes = z.optimum[z.optimumCurrentIndex].backPrev
 		z.optimumCurrentIndex = z.optimum[z.optimumCurrentIndex].posPrev
 		res = lenRes
-
-		//fmt.Printf("[1] z.getOptimum(): z.optimumEndIndex = %d, z.optimumCurrentIndex = %d, z.backRes = %d, lenRes = %d\n",
-		//	z.optimumEndIndex, z.optimumCurrentIndex, int32(z.backRes), lenRes)
-
 		return
 	}
 
@@ -461,29 +393,17 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 	z.optimumCurrentIndex = 0
 	var lenMain uint32
 	var distancePairs uint32
-
-	//fmt.Printf("[2] z.getOptimum(): position = %d, z.longestMatchFound = %t\n", position, z.longestMatchFound)
-
 	if z.longestMatchFound == false {
 		lenMain = z.readMatchDistances()
-
-		//fmt.Printf("[3] z.getOptimum(): position = %d, lenMain = %d\n", position, lenMain)
-
 	} else {
 		lenMain = z.longestMatchLen
 		z.longestMatchFound = false
 	}
 	distancePairs = z.distancePairs
 	availableBytes := z.mf.iw.getNumAvailableBytes() + 1
-
-	//fmt.Printf("[4] z.getOptimum(): position = %d, lenMain = %d, distancePairs = %d, availableBytes = %d\n", position, lenMain, distancePairs, availableBytes)
-
 	if availableBytes < 2 {
 		z.backRes = 0xFFFFFFFF
 		res = 1
-
-		//fmt.Printf("[5] z.getOptimum(): availableBytes = %d, z.backRes = %d, result = %d\n", availableBytes, int32(z.backRes), res)
-
 		return
 	}
 
@@ -503,10 +423,6 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 		lenRes := z.repLens[repMaxIndex]
 		res = lenRes
 		z.movePos(lenRes - 1)
-
-		//fmt.Printf("[6] z.getOptimum(): availableBytes = %d, z.backRes = %d, repMaxIndex = %d, result = %d\n",
-		//	availableBytes, int32(z.backRes), repMaxIndex, res)
-
 		return
 	}
 
@@ -514,24 +430,14 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 		z.backRes = z.matchDistances[distancePairs-1] + kNumRepDistances
 		res = lenMain
 		z.movePos(lenMain - 1)
-
-		//fmt.Printf("[7] z.getOptimum(): availableBytes = %d, z.backRes = %d, repMaxIndex = %d, lenMain = %d, distancePairs = %d, result = %d\n",
-		//	availableBytes, z.backRes, repMaxIndex, lenMain, distancePairs, res)
-
 		return
 	}
 
 	curByte := z.mf.iw.getIndexByte(0 - 1)
-	//fmt.Printf("[7.5] z.getOptimum(): iw.getIndexByte() with arg %d called\n", -1)
 	matchByte := z.mf.iw.getIndexByte(0 - int32(z.repDistances[0]) - 1 - 1)
-	//fmt.Printf("[7.6] z.getOptimum(): iw.getIndexByte() with arg %d called\n", 0-int32(z.repDistances[0])-1-1)
 	if lenMain < 2 && curByte != matchByte && z.repLens[repMaxIndex] < 2 {
 		z.backRes = 0xFFFFFFFF
 		res = 1
-
-		//fmt.Printf("[8] z.getOptimum(): availableBytes = %d, z.backRes = %d, repMaxIndex = %d, lenMain = %d, curByte = %d, matchByte = %d, result = %d\n",
-		//	availableBytes, int32(z.backRes), repMaxIndex, lenMain, int8(curByte), int8(matchByte), res)
-
 		return
 	}
 
@@ -558,10 +464,6 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 	if lenEnd < 2 {
 		z.backRes = z.optimum[1].backPrev
 		res = 1
-
-		//fmt.Printf("[9] z.getOptimum(): z.backRes = %d, lenEnd = %d, lenMain = %d, result = %d\n",
-		//	int32(z.backRes), lenEnd, lenMain, res)
-
 		return
 	}
 
@@ -570,16 +472,10 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 	z.optimum[0].backs1 = z.reps[1]
 	z.optimum[0].backs2 = z.reps[2]
 	z.optimum[0].backs3 = z.reps[3]
-
-	//fmt.Printf("[9.06] z.getOptimum(): %s\n", z.optimum[0].str1())
-	//fmt.Printf("[9.07] z.getOptimum(): %s\n", z.optimum[0].str2())
-
 	length := lenEnd
 DoWhile1:
 	z.optimum[length].price = kInfinityPrice
 	if length--; length >= 2 {
-		// out of about 30 while's, only 3 of them that can't be expressed without a goto
-		// statement; the other occurences of goto explain why code duplicaions isn't an option
 		goto DoWhile1
 	}
 
@@ -591,22 +487,12 @@ DoWhile1:
 		price := repMatchPrice + z.getPureRepPrice(i, z.state, posState)
 	DoWhile2:
 		curAndLenPrice := price + z.repMatchLenCoder.getPrice(repLen-2, posState)
-
-		//fmt.Printf("[9.11] z.getOptimum(): curAndLenPrice = %d, price = %d, repLen = %d, posState = %d, z.state = %d\n",
-		//	curAndLenPrice, price, repLen, posState, z.state)
-
 		optimum := z.optimum[repLen]
 		if curAndLenPrice < optimum.price {
 			optimum.price = curAndLenPrice
 			optimum.posPrev = 0
 			optimum.backPrev = i
 			optimum.prev1IsChar = false
-
-			//fmt.Printf("[9.15] z.getOptimum(): %s\n", optimum.str1())
-			//fmt.Printf("[9.16] z.getOptimum(): %s\n", optimum.str2())
-			//fmt.Printf("[9.17] z.getOptimum(): curAndLenPrice = %d, i = %d, repLen = %d, price = %d, posState = %d, z.state = %d\n",
-			//	curAndLenPrice, i, repLen, price, posState, z.state)
-
 		}
 		if repLen--; repLen >= 2 {
 			goto DoWhile2
@@ -632,13 +518,6 @@ DoWhile1:
 				optimum.posPrev = 0
 				optimum.backPrev = distance + kNumRepDistances
 				optimum.prev1IsChar = false
-
-				//fmt.Printf("[9.25] z.getOptimum(): %s\n", optimum.str1())
-				//fmt.Printf("[9.26] z.getOptimum(): %s\n", optimum.str2())
-				//fmt.Printf("[9.27] z.getOptimum(): distance = %d, curAndLenPrice = %d, normalMatchPrice = %d, length = %d, posState = %d, offs = %d\n",
-				//	distance, curAndLenPrice, normalMatchPrice, length, posState, offs)
-				//fmt.Printf("[9.28] z.getOptimum(): lenMain = %d, distancePairs = %d, z.state = %d\n", lenMain, distancePairs, z.state)
-
 			}
 			if length == z.matchDistances[offs] {
 				offs += 2
@@ -654,9 +533,6 @@ DoWhile1:
 		cur++
 		if cur == lenEnd {
 			res = z.backward(cur)
-
-			//fmt.Printf("[10] z.getOptimum(): cur = %d, lenEnd = %d, result = %d\n", cur, lenEnd, res)
-
 			return
 		}
 
@@ -666,10 +542,6 @@ DoWhile1:
 			z.longestMatchLen = newLen
 			z.longestMatchFound = true
 			res = z.backward(cur)
-
-			//fmt.Printf("[11] z.getOptimum(): cur = %d, lenEnd = %d, newLen = %d, distancePairs = %d, result = %d\n",
-			//	cur, lenEnd, newLen, distancePairs, res)
-
 			return
 		}
 
@@ -748,38 +620,19 @@ DoWhile1:
 		z.optimum[cur].backs2 = z.reps[2]
 		z.optimum[cur].backs3 = z.reps[3]
 		curPrice := z.optimum[cur].price
-
-		//fmt.Printf("[11.09] z.getOptimum(): %s\n", z.optimum[cur].str1())
-		//fmt.Printf("[11.10] z.getOptimum(): %s\n", z.optimum[cur].str2())
-
 		curByte = z.mf.iw.getIndexByte(0 - 1)
-		//fmt.Printf("[11.14] z.getOptimum(): iw.getIndexByte() with arg %d called\n", -1)
 		matchByte = z.mf.iw.getIndexByte(0 - int32(z.reps[0]) - 1 - 1)
-		//fmt.Printf("[11.15] z.getOptimum(): iw.getIndexByte() with arg %d called\n", 0-int32(z.reps[0])-1-1)
 		posState = position & z.posStateMask
 		curAnd1Price := curPrice + getPrice0(uint32(z.isMatch[state<<kNumPosStatesBitsMax+posState])) +
 			z.litCoder.getCoder(position, z.mf.iw.getIndexByte(0-2)).getPrice(!stateIsCharState(state), matchByte, curByte)
-			//fmt.Printf("[11.18] z.getOptimum(): iw.getIndexByte() with arg %d called\n", -2)
 
 		nextOptimum := z.optimum[cur+1]
 		nextIsChar := false
-
-		//fmt.Printf("[11.20] z.getOptimum(): %s\n", nextOptimum.str1())
-		//fmt.Printf("[11.21] z.getOptimum(): %s\n", nextOptimum.str2())
-		//fmt.Printf("[11.22] z.getOptimum(): curAnd1Price = %d, curPrice = %d, state = %d, posState = %d, position = %d, matchByte = %d, curByte = %d\n",
-		//	curAnd1Price, curPrice, state, posState, position, int8(matchByte), int8(curByte))
-
 		if curAnd1Price < nextOptimum.price {
 			nextOptimum.price = curAnd1Price
 			nextOptimum.posPrev = cur
 			nextOptimum.makeAsChar()
 			nextIsChar = true
-
-			//fmt.Printf("[12] z.getOptimum(): %s\n", nextOptimum.str1())
-			//fmt.Printf("[13] z.getOptimum(): %s\n", nextOptimum.str2())
-			//fmt.Printf("[14] z.getOptimum(): cur = %d, curAnd1Price = %d, curByte = %d, matchByte = %d, posState = %d\n",
-			//	cur, curAnd1Price, int8(curByte), int8(matchByte), posState)
-
 		}
 
 		matchPrice = curPrice + getPrice1(uint32(z.isMatch[state<<kNumPosStatesBitsMax+posState]))
@@ -791,13 +644,6 @@ DoWhile1:
 				nextOptimum.posPrev = cur
 				nextOptimum.makeAsShortRep()
 				nextIsChar = true
-
-				//fmt.Printf("[15] z.getOptimum(): %s\n", nextOptimum.str1())
-				//fmt.Printf("[16] z.getOptimum(): %s\n", nextOptimum.str2())
-				//fmt.Printf("[17] z.getOptimum(): cur = %d, curAnd1Price = %d, curByte = %d, matchByte = %d, posState = %d, matchPrice = %d, "+
-				//	"repMatchPrice = %d\n",
-				//	cur, curAnd1Price, int8(curByte), int8(matchByte), posState, matchPrice, repMatchPrice)
-
 			}
 		}
 
@@ -831,14 +677,6 @@ DoWhile1:
 					optimum.backPrev = 0
 					optimum.prev1IsChar = true
 					optimum.prev2 = false
-
-					//fmt.Printf("[18] z.getOptimum(): %s\n", optimum.str1())
-					//fmt.Printf("[19] z.getOptimum(): %s\n", optimum.str2())
-					//fmt.Printf("[20] z.getOptimum(): cur = %d, curAndLenPrice = %d, offset = %d, lenEnd = %d, nextRepMatchPrice = %d, "+
-					//	"posStateNext = %d, lenTest2 = %d, state2 = %d\n",
-					//	cur, curAndLenPrice,
-					//	offset, lenEnd, nextRepMatchPrice, posStateNext, lenTest2, state2)
-
 				}
 			}
 		}
@@ -862,13 +700,6 @@ DoWhile1:
 				optimum.posPrev = cur
 				optimum.backPrev = repIndex
 				optimum.prev1IsChar = false
-
-				//fmt.Printf("[21] z.getOptimum(): %s\n", optimum.str1())
-				//fmt.Printf("[22] z.getOptimum(): %s\n", optimum.str2())
-				//fmt.Printf("[23] z.getOptimum(): cur = %d, curAndLenPrice = %d, repMatchPrice = %d, repIndex = %d, lenTest = %d, state = %d, "+
-				//	"posState = %d, lenEnd = %d\n",
-				//	cur, curAndLenPrice, repMatchPrice, repIndex, lenTest, state, posState, lenEnd)
-
 			}
 			if lenTest--; lenTest >= 2 {
 				goto DoWhile3
@@ -889,50 +720,18 @@ DoWhile1:
 						getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
 						z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
 							true, z.mf.iw.getIndexByte(int32(lenTest)-1-(int32(z.reps[repIndex]+1))), z.mf.iw.getIndexByte(int32(lenTest)-1))
-						/*
-							//==========================
-							at1 := z.getRepPrice(repIndex, lenTest, state, posState)
-							at2 := getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
-							ec2 := z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1))
-							fmt.Printf("[23.20] z.getOptimum(): iw.getIndexByte() with arg %d called\n", int32(lenTest)-1-1)
-							at3 := ec2.getPrice(true,
-								z.mf.iw.getIndexByte(int32(lenTest)-1-(int32(z.reps[repIndex]+1))),
-								z.mf.iw.getIndexByte(int32(lenTest)-1))
-							curAndLenCharPrice := repMatchPrice + at1 + at2 + at3
-							fmt.Printf("[23.21] z.getOptimum(): iw.getIndexByte() with arg %d called\n", int32(lenTest)-1-(int32(z.reps[repIndex]+1)))
-							fmt.Printf("[23.22] z.getOptimum(): iw.getIndexByte() with arg %d called\n", int32(lenTest)-1)
-							//==========================
-						*/
-						//fmt.Printf("[23.29] z.getOptimum(): curAndLenCharPrice = %d\n", curAndLenCharPrice)
-
 					state2 = stateUpdateChar(state2)
 					posStateNext = (position + lenTest + 1) & z.posStateMask
 					nextMatchPrice := curAndLenCharPrice + getPrice1(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
 					nextRepMatchPrice := nextMatchPrice + getPrice1(uint32(z.isRep[state2]))
 
 					offset := lenTest + 1 + lenTest2
-
-					//fmt.Printf("[23.40] z.getOptimum(): offset = %d, lenTest = %d, lenTest2 = %d, nextRepMatchPrice = %d, nextMatchPrice = %d, "+
-					//	"posStateNext = %d, state2 = %d, lenEnd = %d, cur = %d\n",
-					//	offset, lenTest,
-					//	lenTest2, nextRepMatchPrice, nextMatchPrice, posStateNext, state2, lenEnd, cur)
-
 					for lenEnd < cur+offset {
 						lenEnd++
 						z.optimum[lenEnd].price = kInfinityPrice
-
-						//fmt.Printf("[23.41] z.getOptimum(): lenEnd = %d, cur = %d, offset = %d, kInfinityPrice = %d, "+
-						//	"z.optimum[lenEnd].price = %d\n",
-						//	lenEnd, cur, offset, kInfinityPrice, z.optimum[lenEnd].price)
-
 					}
 					curAndLenPrice := nextRepMatchPrice + z.getRepPrice(0, lenTest2, state2, posStateNext)
 					optimum := z.optimum[cur+offset]
-
-					//fmt.Printf("[23.41] z.getOptimum(): curAndLenPrice = %d, nextRepMatchPrice = %d, lenTest2 = %d, state2 = %d, posStateNext = %d, "+
-					//	"cur = %d, offset = %d\n",
-					//	curAndLenPrice, nextRepMatchPrice, lenTest2, state2, posStateNext, cur, offset)
-
 					if curAndLenPrice < optimum.price {
 						optimum.price = curAndLenPrice
 						optimum.posPrev = cur + lenTest + 1
@@ -941,18 +740,6 @@ DoWhile1:
 						optimum.prev2 = true
 						optimum.posPrev2 = cur
 						optimum.backPrev2 = repIndex
-
-						//fmt.Printf("[24] z.getOptimum(): %s\n", optimum.str1())
-						//fmt.Printf("[25] z.getOptimum(): %s\n", optimum.str2())
-						//fmt.Printf("[26] z.getOptimum(): cur = %d, lenTest = %d, curAndLenPrice = %d, repIndex = %d, nextRepMatchPrice = %d, "+
-						//	"nextMatchPrice = %d\n",
-						//	cur, lenTest, curAndLenPrice, repIndex, nextRepMatchPrice, nextMatchPrice)
-						//fmt.Printf("[27] z.getOptimum(): lenTest2 = %d, state2 = %d, posStateNext = %d, curAndLenCharPrice = %d, state = %d, "+
-						//	"posState = %d\n",
-						//	lenTest2, state2, posStateNext, curAndLenCharPrice, state, posState)
-						//fmt.Printf("[28] z.getOptimum(): position = %d, availableBytesFull = %d, t = %d, offset = %d\n",
-						//	position, availableBytesFull, t, offset)
-
 					}
 				}
 			}
@@ -986,13 +773,6 @@ DoWhile1:
 					optimum.posPrev = cur
 					optimum.backPrev = curBack + kNumRepDistances
 					optimum.prev1IsChar = false
-
-					//fmt.Printf("[29] z.getOptimum(): %s\n", optimum.str1())
-					//fmt.Printf("[30] z.getOptimum(): %s\n", optimum.str2())
-					//fmt.Printf("[31] z.getOptimum(): cur = %d, curBack = %d, curAndLenPrice = %d, lenTest = %d, offs = %d, startLen = %d, "+
-					//	"newLen = %d\n",
-					//	cur, curBack, curAndLenPrice, lenTest, offs, startLen, newLen)
-
 				}
 				if lenTest == z.matchDistances[offs] {
 					if lenTest < availableBytesFull {
@@ -1001,37 +781,11 @@ DoWhile1:
 						if lenTest2 >= 2 {
 							state2 := stateUpdateMatch(state)
 							posStateNext := (position + lenTest) & z.posStateMask
-							//getPrice0_temp_F
 							curAndLenCharPrice := curAndLenPrice +
 								getPrice0(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext])) +
 								z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
 									true, z.mf.iw.getIndexByte(int32(lenTest)-(int32(curBack)+1)-1),
 									z.mf.iw.getIndexByte(int32(lenTest)-1))
-								/*
-									//======================
-									at1 := getPrice0_temp_F(uint32(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]))
-									index1 := int32(lenTest) - 1 - 1
-									fmt.Println("[31.10] z.getOptimum(): get the subcoder")
-									ec2 := z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(index1))
-									fmt.Printf("[31.11] z.getOptimum(): iw.getIndexByte() with arg %d called\n", index1)
-									index2 := int32(lenTest) - (int32(curBack) + 1) - 1
-									index3 := int32(lenTest) - 1
-									at2 := ec2.getPrice(true, z.mf.iw.getIndexByte(index2), z.mf.iw.getIndexByte(index3))
-									fmt.Printf("[31.12] z.getOptimum(): iw.getIndexByte() with arg %d called\n", index2)
-									fmt.Printf("[31.13] z.getOptimum(): iw.getIndexByte() with arg %d called\n", index3)
-									curAndLenCharPrice := curAndLenPrice + at1 + at2
-									//======================
-								*/
-								//fmt.Printf("[31.18] z.getOptimum(): t = %d, availableBytesFull = %d, lenTest = %d, offs = %d, curBack = %d, "+
-								//	"lenTest2 = %d, state2 = %d, state = %d\n",
-								//	t, availableBytesFull,
-								//	lenTest, offs, curBack, lenTest2, state2, state)
-								//fmt.Printf("[31.19] z.getOptimum(): posStateNext = %d, position = %d, z.posStateMask = %d, "+
-								//	"curAndLenCharPrice = %d, curAndLenPrice = %d\n",
-								//	posStateNext, position,
-								//	z.posStateMask, curAndLenCharPrice, curAndLenPrice)
-								//fmt.Printf("[31.20] z.getOptimum(): index1 = %d, index2 = %d, index3 = %d, at1 = %d, at2 = %d\n",
-								//	index1, index2, index3, at1, at2)
 
 							state2 = stateUpdateChar(state2)
 							posStateNext = (position + lenTest + 1) & z.posStateMask
@@ -1052,25 +806,10 @@ DoWhile1:
 								optimum.prev2 = true
 								optimum.posPrev2 = cur
 								optimum.backPrev2 = curBack + kNumRepDistances
-
-								//fmt.Printf("[32] z.getOptimum(): %s\n", optimum.str1())
-								//fmt.Printf("[33] z.getOptimum(): %s\n", optimum.str2())
-								//fmt.Printf("[34] z.getOptimum(): cur = %d, curBack = %d, lenTest = %d, curAndLenPrice = %d, "+
-								//	"offset = %d, nextRepMatchPrice = %d\n",
-								//	cur, curBack, lenTest,
-								//	curAndLenPrice, offset, nextRepMatchPrice)
-								//fmt.Printf("[35] z.getOptimum(): lenTest2 = %d, state2 = %d, posStateNext = %d, nextMatchPrice = %d, "+
-								//	"curAndLenCharPrice = %d, position = %d\n",
-								//	lenTest2, state2, posStateNext,
-								//	nextMatchPrice, curAndLenCharPrice, position)
-
 							}
 						}
 					}
 					offs += 2
-
-					//fmt.Printf("[35] z.getOptimum(): cur = %d, offs = %d, distancePairs = %d\n", cur, offs, distancePairs)
-
 					if offs == distancePairs {
 						break
 					}
@@ -1084,7 +823,6 @@ DoWhile1:
 var tempPrices []uint32 = make([]uint32, kNumFullDistances)
 
 func (z *encoder) fillDistancesPrices() {
-	//tempPrices := make([]uint32, kNumFullDistances) // leaks memory
 	for i := uint32(kStartPosModelIndex); i < kNumFullDistances; i++ {
 		posSlot := getPosSlot(i)
 		footerBits := posSlot>>1 - 1
@@ -1096,17 +834,9 @@ func (z *encoder) fillDistancesPrices() {
 		st := lenToPosState << kNumPosSlotBits
 		for posSlot = 0; posSlot < z.distTableSize; posSlot++ {
 			z.posSlotPrices[st+posSlot] = z.posSlotCoders[lenToPosState].getPrice(posSlot)
-			/*
-				fmt.Printf("[0] z.fillDistancesPrices(): lenToPosState = %d, posSlot = %d, st = %d, z.posSlotPrices[st+posSlot] = %d\n",
-					lenToPosState, posSlot, st, z.posSlotPrices[st+posSlot])
-			*/
 		}
 		for posSlot = kEndPosModelIndex; posSlot < z.distTableSize; posSlot++ {
 			z.posSlotPrices[st+posSlot] += (posSlot>>1 - 1 - kNumAlignBits) << kNumBitPriceShiftBits
-			/*
-				fmt.Printf("[1] z.fillDistancesPrices(): lenToPosState = %d, posSlot = %d, st = %d, z.posSlotPrices[st+posSlot] = %d\n",
-					lenToPosState, posSlot, st, z.posSlotPrices[st+posSlot])
-			*/
 		}
 		var i uint32
 		st2 := lenToPosState * kNumFullDistances
@@ -1162,7 +892,6 @@ func (z *encoder) codeOneBlock() {
 		z.re.encode(z.isMatch, uint32(z.state<<kNumPosStatesBitsMax)+uint32(z.nowPos)&z.posStateMask, 0)
 		z.state = stateUpdateChar(z.state)
 		curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
-		//fmt.Printf("[0.10] z.copyOneBlock(): iw.getIndexByte() with arg %d called\n", 0-int32(z.additionalOffset))
 		z.litCoder.getCoder(uint32(z.nowPos), z.prevByte).encode(z.re, curByte)
 		z.prevByte = curByte
 		z.additionalOffset--
@@ -1178,19 +907,12 @@ func (z *encoder) codeOneBlock() {
 		posState := uint32(z.nowPos) & z.posStateMask
 		complexState := z.state<<kNumPosStatesBitsMax + posState
 
-		//fmt.Printf("[1] z.codeOnBlock(): progressPosValuePrev = %d, z.prevByte = %d, z.additionalOffset = %d\n",
-		//	progressPosValuePrev, int8(z.prevByte), z.additionalOffset)
-		//fmt.Printf("[2] z.codeOnBlock(): z.nowPos = %d, length = %d, pos = %d, posState = %d, complexState = %d\n",
-		//	z.nowPos, length, int32(pos), posState, complexState)
-
 		if length == 1 && pos == 0xFFFFFFFF {
 			z.re.encode(z.isMatch, complexState, 0)
 			curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
-			//fmt.Printf("[2.11] z.copyOneBlock(): iw.getIndexByte() with arg %d called\n", 0-int32(z.additionalOffset))
 			lc2 := z.litCoder.getCoder(uint32(z.nowPos), z.prevByte)
 			if stateIsCharState(z.state) == false {
 				matchByte := z.mf.iw.getIndexByte(0 - int32(z.repDistances[0]) - 1 - int32(z.additionalOffset))
-				//fmt.Printf("[2.14] z.copyOneBlock(): iw.getIndexByte() with arg %d called\n", 0-int32(z.repDistances[0])-1-int32(z.additionalOffset))
 				lc2.encodeMatched(z.re, matchByte, curByte)
 			} else {
 				lc2.encode(z.re, curByte)
@@ -1238,10 +960,6 @@ func (z *encoder) codeOneBlock() {
 				posSlot := getPosSlot(uint32(pos))
 				lenToPosState := getLenToPosState(uint32(length))
 				z.posSlotCoders[lenToPosState].encode(z.re, posSlot)
-
-				//fmt.Printf("[2.18] z.copyOneBlock(): posSlot = %d, length = %d, pos = %d, lenToPosState = %d, z.state = %d\n",
-				//	posSlot, length, pos, lenToPosState, z.state)
-
 				if posSlot >= kStartPosModelIndex {
 					footerBits := posSlot>>1 - 1
 					baseVal := (2 | posSlot&1) << footerBits
@@ -1261,19 +979,10 @@ func (z *encoder) codeOneBlock() {
 				z.matchPriceCount++
 			}
 			z.prevByte = z.mf.iw.getIndexByte(int32(length) - 1 - int32(z.additionalOffset))
-			//fmt.Printf("[2.25] z.copyOneBlock(): iw.getIndexByte() with arg %d called\n", int32(length)-1-int32(z.additionalOffset))
 		}
 		z.additionalOffset -= length
 		z.nowPos += int64(length)
-
-		//fmt.Printf("[3] z.copyOneBlock(): z.additionalOffset = %d, z.nowPos = %d, length = %d\n", z.additionalOffset, z.nowPos, length)
-
 		if z.additionalOffset == 0 {
-
-			//fmt.Printf("[4] z.copyOneBlock(): z.matchPriceCount = %d, z.alignPriceCount = %d, z.mf.iw.getNumAvailableBytes() = %d\n",
-			//	z.matchPriceCount, z.alignPriceCount, z.mf.iw.getNumAvailableBytes())
-
-			// z.fillDistancesPrices_temp_F
 			if z.matchPriceCount >= 1<<7 {
 				z.fillDistancesPrices()
 			}
@@ -1296,7 +1005,6 @@ func (z *encoder) doEncode() {
 	for {
 		z.codeOneBlock()
 		if z.finished == true {
-			//println("z.finished is true")
 			break
 		}
 	}

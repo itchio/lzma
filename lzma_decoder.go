@@ -1,15 +1,10 @@
 /*
-The lzma package implements reading and writing of LZMA
-format compressed data originaly developed by Igor Pavlov.
-As reference implementations have been taken LZMA SDK version 4.65
-available online at:
+The lzma package implements reading and writing of LZMA format compressed data.
+Reference implementation is LZMA SDK version 4.65 originaly developed by Igor
+Pavlov, available online at:
 
   http://www.7-zip.org/sdk.html
 
-Note that LZMA doesn't store any metadata about the file. Neither can
-it compress multiple files because it's not an archiving format. Both
-these issues are solved if the file or files are archived with tar
-before compression with LZMA.
 */
 package lzma
 
@@ -276,7 +271,7 @@ func (z *decoder) doDecode() {
 func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	defer handlePanics(&err)
 
-	// read first 13 bytes from r which contain lc, lp, pb, dictSize and unpackedSize
+	// read 13 bytes (lzma header)
 	header := make([]byte, lzmaHeaderSize)
 	n, err := r.Read(header) // ERR
 	if err != nil {
