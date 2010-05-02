@@ -51,7 +51,7 @@ func newRangeDecoder(r io.Reader) *rangeDecoder {
 
 func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32) {
 	for i := numTotalBits; i != 0; i-- {
-		rd.rrange = rd.rrange >> 1
+		rd.rrange >>= 1
 		t := (rd.code - rd.rrange) >> 31
 		rd.code -= rd.rrange & (t - 1)
 		res = (res << 1) | (1 - t)

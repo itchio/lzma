@@ -81,7 +81,7 @@ func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 		for ; int32(i) >= 0; i-- {
 			matchBit := (uMatchByte >> i) & 1
 			bit := (uSymbol >> i) & 1
-			price += getPrice(lc2.coders[1+matchBit<<8+context], bit)
+			price += getPrice(lc2.coders[(1+matchBit)<<8+context], bit)
 			context = context<<1 | bit
 			if matchBit != bit {
 				i--
