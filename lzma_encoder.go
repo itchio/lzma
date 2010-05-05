@@ -1134,6 +1134,10 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // If size is -1, a marker of 6 bytes is written at the end of the stream.
 //
 func NewEncoderSizeLevel(w io.Writer, size int64, level int) (pwc io.WriteCloser) {
+	// the reason for which size is an argument is that lzma, unlike gzip, 
+	// stores the size before any compressed data. gzip appends the size and
+	// the checksum at the end of the stream, thus it can compute the size
+	// while reading data from pipe.
 	var z encoder
 	pr, pw := syncPipe()
 	go func() {

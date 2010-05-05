@@ -121,8 +121,8 @@ const (
 )
 
 // The actual write interface needed by NewEncoder. If the passed in io.Writer
-// does not also have WriteByte and Flush, the NewEncoder will introduce its
-// own buffering.
+// does not also have WriteByte and Flush, the NewEncoder will wrap it into an
+// bufio.Writer.
 type Writer interface {
 	io.Writer
 	Flush() os.Error
