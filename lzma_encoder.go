@@ -113,17 +113,17 @@ type compressionLevel struct {
 	//matchCycles     uint32 // mc
 }
 
-var levels = []*compressionLevel{
-	&compressionLevel{},                        // 0
-	&compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
-	&compressionLevel{18, 64, 3, 0, 2, "bt4"},  // 2
-	&compressionLevel{20, 64, 3, 0, 2, "bt4"},  // 3
-	&compressionLevel{22, 128, 3, 0, 2, "bt4"}, // 4
-	&compressionLevel{23, 128, 3, 0, 2, "bt4"}, // 5
-	&compressionLevel{24, 128, 3, 0, 2, "bt4"}, // 6
-	&compressionLevel{25, 256, 3, 0, 2, "bt4"}, // 7
-	&compressionLevel{26, 256, 3, 0, 2, "bt4"}, // 8
-	&compressionLevel{27, 256, 3, 0, 2, "bt4"}, // 9
+var levels = []compressionLevel{
+	compressionLevel{},                        // 0
+	compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
+	compressionLevel{18, 64, 3, 0, 2, "bt4"},  // 2
+	compressionLevel{20, 64, 3, 0, 2, "bt4"},  // 3
+	compressionLevel{22, 128, 3, 0, 2, "bt4"}, // 4
+	compressionLevel{23, 128, 3, 0, 2, "bt4"}, // 5
+	compressionLevel{24, 128, 3, 0, 2, "bt4"}, // 6
+	compressionLevel{25, 256, 3, 0, 2, "bt4"}, // 7
+	compressionLevel{26, 256, 3, 0, 2, "bt4"}, // 8
+	compressionLevel{27, 256, 3, 0, 2, "bt4"}, // 9
 }
 
 func (cl *compressionLevel) checkValues() {
@@ -1018,11 +1018,12 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	if level < 1 || level > 9 {
 		return &argumentValueError{"level out of range", level}
 	}
-	z.cl = levels[level]
+	cl := levels[level]
+	z.cl = &cl
 	z.cl.checkValues()
 	z.distTableSize = z.cl.dictSize * 2
 	z.cl.dictSize = 1 << z.cl.dictSize
-	if size < -1 { // -1 stands for unknown size, but can the size be equal to zero ?
+	if size < -1 { // size can be equal to zero
 		return &argumentValueError{"illegal size", size}
 	}
 	z.size = size
@@ -1133,8 +1134,8 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // size and level (the lzma header) are written to w before any compressed data.
 // If size is -1, a marker of 6 bytes is written at the end of the stream.
 //
-func NewEncoderSizeLevel(w io.Writer, size int64, level int) (pwc io.WriteCloser) {
-	// the reason for which size is an argument is that lzma, unlike gzip, 
+func NewEncoderSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
+	// the reason for which size is an argument is that lzma, unlike gzip,
 	// stores the size before any compressed data. gzip appends the size and
 	// the checksum at the end of the stream, thus it can compute the size
 	// while reading data from pipe.
