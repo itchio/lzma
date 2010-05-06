@@ -288,9 +288,6 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.unpackSize = 0
 	for i := 0; i < 8; i++ {
 		b := header[lzmaPropSize+i]
-		if int32(b) < 0 {
-			return headerError
-		}
 		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
 	}
 

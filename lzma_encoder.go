@@ -1132,7 +1132,8 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // BestCompression.
 //
 // size and level (the lzma header) are written to w before any compressed data.
-// If size is -1, a marker of 6 bytes is written at the end of the stream.
+// If size is -1, last bytes are encoded in a special way to mark the end of the
+// stream. The size of the compressed data will increase by 5 or 6 bytes.
 //
 func NewEncoderSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
 	// the reason for which size is an argument is that lzma, unlike gzip,

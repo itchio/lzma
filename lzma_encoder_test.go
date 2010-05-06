@@ -52,7 +52,7 @@ func TestEmpty2(t *testing.T) {
 	testEmpty(t, false)
 }
 
-func testSmth(t *testing.T, sizeIsKnown bool) {
+func testBoth(t *testing.T, sizeIsKnown bool) {
 	size := int64(-1)
 	payload := []byte("lzmalzmalzma")
 	if sizeIsKnown == true {
@@ -80,10 +80,10 @@ func testSmth(t *testing.T, sizeIsKnown bool) {
 		size)
 }
 
-func TestSmth1(t *testing.T) {
-	testSmth(t, true)
+func TestBoth1(t *testing.T) {
+	testBoth(t, true)
 }
 
-func TestSmth2(t *testing.T) {
-	testSmth(t, false)
+func TestBoth2(t *testing.T) {
+	testBoth(t, false)
 }
