@@ -93,7 +93,7 @@ func TestBoth2(t *testing.T) {
 
 func TestEncoder(t *testing.T) {
 	b := new(bytes.Buffer)
-	for _, tt := range unlzmaTests {
+	for _, tt := range lzmaTests {
 		if tt.err == nil {
 			pr, pw := io.Pipe()
 			defer pr.Close()
@@ -125,25 +125,32 @@ func TestEncoder(t *testing.T) {
 }
 
 func BenchmarkEncoder(b *testing.B) {
+	b.StopTimer()
 	buf := new(bytes.Buffer)
+	start := make(chan bool)
 	for i := 0; i < b.N; i++ {
-		in := bytes.NewBuffer([]byte(bk.raw))
+		in := bytes.NewBuffer(bk.raw)
 		pr, pw := io.Pipe()
+		defer pr.Close()
 		go func() {
+			defer pw.Close()
 			w := NewEncoderLevel(pw, bk.level)
-			_, err := io.Copy(w, in)
+			defer w.Close()
+			start <- true
+			n, err := io.Copy(w, in)
 			if err != nil {
 				log.Exitf("%v", err)
 			}
-			defer pw.Close()
-			defer w.Close()
+			b.SetBytes(n)
 		}()
 		buf.Reset()
+		<-start // wait for encoder to start encoding before starting the timer
+		b.StartTimer()
 		_, err := io.Copy(buf, pr)
+		b.StopTimer()
 		if err != nil {
 			log.Exitf("%v", err)
 		}
-		defer pr.Close()
 	}
 	if reflect.DeepEqual(buf.Bytes(), bk.lzma) == false { // check only once, not at every iteration
 		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bk.descr, len(buf.Bytes()), buf.String(), len(bk.lzma), string(bk.lzma))
