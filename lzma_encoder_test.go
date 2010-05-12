@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"reflect"
 	"testing"
 )
 
@@ -117,7 +116,7 @@ func TestEncoder(t *testing.T) {
 				t.Errorf("%v", err)
 			}
 			res := b.Bytes()
-			if reflect.DeepEqual(res, tt.lzma) == false {
+			if bytes.Equal(res, tt.lzma) == false {
 				t.Errorf("%s: got %d-byte %q, want %d-byte %q", tt.descr, len(res), string(res), len(tt.lzma), string(tt.lzma))
 			}
 		}
@@ -152,7 +151,7 @@ func BenchmarkEncoder(b *testing.B) {
 			log.Exitf("%v", err)
 		}
 	}
-	if reflect.DeepEqual(buf.Bytes(), bk.lzma) == false { // check only once, not at every iteration
+	if bytes.Equal(buf.Bytes(), bk.lzma) == false { // check only once, not at every iteration
 		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bk.descr, len(buf.Bytes()), buf.String(), len(bk.lzma), string(bk.lzma))
 	}
 }

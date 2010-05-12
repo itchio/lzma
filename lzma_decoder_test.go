@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"io"
 	"log"
-	"reflect"
 	"testing"
 )
 
@@ -39,6 +38,8 @@ func BenchmarkDecoder(b *testing.B) {
 		buf.Reset()
 		in := bytes.NewBuffer(bk.lzma)
 		b.StartTimer()
+		// timer starts before this contructor because variable "in" already
+		// contains data, so the decoding start rigth away
 		r := NewDecoder(in)
 		n, err := io.Copy(buf, r)
 		b.StopTimer()
@@ -48,7 +49,7 @@ func BenchmarkDecoder(b *testing.B) {
 		b.SetBytes(n)
 		r.Close()
 	}
-	if reflect.DeepEqual(buf.Bytes(), bk.raw) == false { // check only after last iteration
+	if bytes.Equal(buf.Bytes(), bk.raw) == false { // check only after last iteration
 		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bk.descr, len(buf.Bytes()), buf.String(), len(bk.raw), bk.raw)
 	}
 }
