@@ -80,11 +80,11 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 		rd.rrange = newBound
 		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
 		if rd.rrange < kTopValue {
-			c, err := rd.r.ReadByte() // ERR - panic
+			b, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | uint32(c)
+			rd.code = (rd.code << 8) | uint32(b)
 			rd.rrange = rd.rrange << 8
 		}
 		res = 0
@@ -93,11 +93,11 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 		rd.code -= newBound
 		probs[index] = prob - prob>>kNumMoveBits
 		if rd.rrange < kTopValue {
-			c, err := rd.r.ReadByte() // ERR - panic
+			b, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | uint32(c)
+			rd.code = (rd.code << 8) | uint32(b)
 			rd.rrange <<= 8
 		}
 		res = 1

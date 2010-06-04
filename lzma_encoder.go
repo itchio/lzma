@@ -113,6 +113,7 @@ type compressionLevel struct {
 	//matchCycles     uint32 // mc
 }
 
+// levels is intended to be constant, but there is no way to enforce this constraint
 var levels = []compressionLevel{
 	compressionLevel{},                        // 0
 	compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
@@ -442,7 +443,7 @@ func (z *encoder) getOptimum(position uint32) (res uint32) {
 	z.optimum[0].state = z.state
 	posState := position & z.posStateMask
 	z.optimum[1].price = getPrice0(z.isMatch[z.state<<kNumPosStatesBitsMax+posState]) +
-		z.litCoder.getCoder(position, z.prevByte).getPrice(!stateIsCharState(z.state), matchByte, curByte)
+		z.litCoder.getSubCoder(position, z.prevByte).getPrice(!stateIsCharState(z.state), matchByte, curByte)
 	z.optimum[1].makeAsChar()
 
 	matchPrice := getPrice1(z.isMatch[z.state<<kNumPosStatesBitsMax+posState])
@@ -622,7 +623,7 @@ DoWhile1:
 		matchByte = z.mf.iw.getIndexByte(0 - int32(z.reps[0]) - 1 - 1)
 		posState = position & z.posStateMask
 		curAnd1Price := curPrice + getPrice0(z.isMatch[state<<kNumPosStatesBitsMax+posState]) +
-			z.litCoder.getCoder(position, z.mf.iw.getIndexByte(0-2)).getPrice(!stateIsCharState(state), matchByte, curByte)
+			z.litCoder.getSubCoder(position, z.mf.iw.getIndexByte(0-2)).getPrice(!stateIsCharState(state), matchByte, curByte)
 
 		nextOptimum := z.optimum[cur+1]
 		nextIsChar := false
@@ -716,7 +717,7 @@ DoWhile1:
 					posStateNext := (position + lenTest) & z.posStateMask
 					curAndLenCharPrice := repMatchPrice + z.getRepPrice(repIndex, lenTest, state, posState) +
 						getPrice0(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]) +
-						z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
+						z.litCoder.getSubCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
 							true, z.mf.iw.getIndexByte(int32(lenTest)-1-(int32(z.reps[repIndex]+1))), z.mf.iw.getIndexByte(int32(lenTest)-1))
 					state2 = stateUpdateChar(state2)
 					posStateNext = (position + lenTest + 1) & z.posStateMask
@@ -781,7 +782,7 @@ DoWhile1:
 							posStateNext := (position + lenTest) & z.posStateMask
 							curAndLenCharPrice := curAndLenPrice +
 								getPrice0(z.isMatch[state2<<kNumPosStatesBitsMax+posStateNext]) +
-								z.litCoder.getCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
+								z.litCoder.getSubCoder(position+lenTest, z.mf.iw.getIndexByte(int32(lenTest)-1-1)).getPrice(
 									true, z.mf.iw.getIndexByte(int32(lenTest)-(int32(curBack)+1)-1),
 									z.mf.iw.getIndexByte(int32(lenTest)-1))
 
@@ -890,7 +891,7 @@ func (z *encoder) codeOneBlock() {
 		z.re.encode(z.isMatch, z.state<<kNumPosStatesBitsMax+uint32(z.nowPos)&z.posStateMask, 0)
 		z.state = stateUpdateChar(z.state)
 		curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
-		z.litCoder.getCoder(uint32(z.nowPos), z.prevByte).encode(z.re, curByte)
+		z.litCoder.getSubCoder(uint32(z.nowPos), z.prevByte).encode(z.re, curByte)
 		z.prevByte = curByte
 		z.additionalOffset--
 		z.nowPos++
@@ -908,12 +909,12 @@ func (z *encoder) codeOneBlock() {
 		if length == 1 && pos == 0xFFFFFFFF {
 			z.re.encode(z.isMatch, complexState, 0)
 			curByte := z.mf.iw.getIndexByte(0 - int32(z.additionalOffset))
-			lc2 := z.litCoder.getCoder(uint32(z.nowPos), z.prevByte)
+			lsc := z.litCoder.getSubCoder(uint32(z.nowPos), z.prevByte)
 			if stateIsCharState(z.state) == false {
 				matchByte := z.mf.iw.getIndexByte(0 - int32(z.repDistances[0]) - 1 - int32(z.additionalOffset))
-				lc2.encodeMatched(z.re, matchByte, curByte)
+				lsc.encodeMatched(z.re, matchByte, curByte)
 			} else {
-				lc2.encode(z.re, curByte)
+				lsc.encode(z.re, curByte)
 			}
 			z.prevByte = curByte
 			z.state = stateUpdateChar(z.state)
@@ -1011,6 +1012,7 @@ func (z *encoder) doEncode() {
 func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err os.Error) {
 	defer handlePanics(&err)
 
+	// these functions are good candidates for init() but the decoder doesn't need them
 	initProbPrices()
 	initCrcTable()
 	initGFastPos()
@@ -1018,6 +1020,9 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	if level < 1 || level > 9 {
 		return &argumentValueError{"level out of range", level}
 	}
+	// do not asign &levels[level] directly to z.cl because dictSize is modified later
+	// and the next run of this funcion with the same compression level will fail;
+	// levels is intended to be const, but there is no way enforce this constraint.
 	cl := levels[level]
 	z.cl = &cl
 	z.cl.checkValues()
@@ -1132,8 +1137,8 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // BestCompression.
 //
 // size and level (the lzma header) are written to w before any compressed data.
-// If size is -1, last bytes are encoded in a special way to mark the end of the
-// stream. The size of the compressed data will increase by 5 or 6 bytes.
+// If size is -1, last bytes are encoded in a different way to mark the end of
+// the stream. The size of the compressed data will increase by 5 or 6 bytes.
 //
 func NewEncoderSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
 	// the reason for which size is an argument is that lzma, unlike gzip,

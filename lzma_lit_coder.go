@@ -4,37 +4,37 @@
 
 package lzma
 
-type litCoder2 struct {
+type litSubCoder struct {
 	coders []uint16
 }
 
-func newLitCoder2() *litCoder2 {
-	return &litCoder2{
+func newLitSubCoder() *litSubCoder {
+	return &litSubCoder{
 		coders: initBitModels(0x300),
 	}
 }
 
 
-func (lc2 *litCoder2) decodeNormal(rd *rangeDecoder) byte {
+func (lsc *litSubCoder) decodeNormal(rd *rangeDecoder) byte {
 	symbol := uint32(1)
 	for symbol < 0x100 {
-		i := rd.decodeBit(lc2.coders, symbol)
+		i := rd.decodeBit(lsc.coders, symbol)
 		symbol = symbol<<1 | i
 	}
 	return byte(symbol)
 }
 
-func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) byte {
+func (lsc *litSubCoder) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) byte {
 	uMatchByte := uint32(matchByte)
 	symbol := uint32(1)
 	for symbol < 0x100 {
 		matchBit := (uMatchByte >> 7) & 1
 		uMatchByte <<= 1
-		bit := rd.decodeBit(lc2.coders, ((1+matchBit)<<8)+symbol)
+		bit := rd.decodeBit(lsc.coders, ((1+matchBit)<<8)+symbol)
 		symbol = (symbol << 1) | bit
 		if matchBit != bit {
 			for symbol < 0x100 {
-				i := rd.decodeBit(lc2.coders, symbol)
+				i := rd.decodeBit(lsc.coders, symbol)
 				symbol = (symbol << 1) | i
 			}
 			break
@@ -44,17 +44,17 @@ func (lc2 *litCoder2) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) byte
 }
 
 
-func (lc2 *litCoder2) encode(re *rangeEncoder, symbol byte) {
+func (lsc *litSubCoder) encode(re *rangeEncoder, symbol byte) {
 	uSymbol := uint32(symbol)
 	context := uint32(1)
 	for i := uint32(7); int32(i) >= 0; i-- {
 		bit := (uSymbol >> i) & 1
-		re.encode(lc2.coders, context, bit)
+		re.encode(lsc.coders, context, bit)
 		context = context<<1 | bit
 	}
 }
 
-func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) {
+func (lsc *litSubCoder) encodeMatched(re *rangeEncoder, matchByte, symbol byte) {
 	uMatchByte := uint32(matchByte)
 	uSymbol := uint32(symbol)
 	context := uint32(1)
@@ -70,12 +70,12 @@ func (lc2 *litCoder2) encodeMatched(re *rangeEncoder, matchByte, symbol byte) {
 				same = true
 			}
 		}
-		re.encode(lc2.coders, state, bit)
+		re.encode(lsc.coders, state, bit)
 		context = context<<1 | bit
 	}
 }
 
-func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
+func (lsc *litSubCoder) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 	uMatchByte := uint32(matchByte)
 	uSymbol := uint32(symbol)
 	price := uint32(0)
@@ -85,7 +85,7 @@ func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 		for ; int32(i) >= 0; i-- {
 			matchBit := (uMatchByte >> i) & 1
 			bit := (uSymbol >> i) & 1
-			price += getPrice(lc2.coders[(1+matchBit)<<8+context], bit)
+			price += getPrice(lsc.coders[(1+matchBit)<<8+context], bit)
 			context = context<<1 | bit
 			if matchBit != bit {
 				i--
@@ -95,7 +95,7 @@ func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 	}
 	for ; int32(i) >= 0; i-- {
 		bit := (uSymbol >> i) & 1
-		price += getPrice(lc2.coders[context], bit)
+		price += getPrice(lsc.coders[context], bit)
 		context = context<<1 | bit
 	}
 	return price
@@ -103,7 +103,7 @@ func (lc2 *litCoder2) getPrice(matchMode bool, matchByte, symbol byte) uint32 {
 
 
 type litCoder struct {
-	coders      []*litCoder2
+	coders      []*litSubCoder
 	numPrevBits uint32
 	numPosBits  uint32
 	posMask     uint32
@@ -112,20 +112,17 @@ type litCoder struct {
 func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
 	numStates := uint32(1) << (numPrevBits + numPosBits)
 	lc := &litCoder{
-		coders:      make([]*litCoder2, numStates),
+		coders:      make([]*litSubCoder, numStates),
 		numPrevBits: numPrevBits,
 		numPosBits:  numPosBits,
 		posMask:     (1 << numPosBits) - 1,
 	}
 	for i := uint32(0); i < numStates; i++ {
-		lc.coders[i] = newLitCoder2()
+		lc.coders[i] = newLitSubCoder()
 	}
 	return lc
 }
 
-// TODO: rename getCoder to getSubCoder or subCoder
-// TODO: rename litCoder2 to litSubCoder
-func (lc *litCoder) getCoder(pos uint32, prevByte byte) *litCoder2 {
-	lc2 := lc.coders[((pos&lc.posMask)<<lc.numPrevBits)+uint32(prevByte>>(8-lc.numPrevBits))]
-	return lc2
+func (lc *litCoder) getSubCoder(pos uint32, prevByte byte) *litSubCoder {
+	return lc.coders[((pos&lc.posMask)<<lc.numPrevBits)+uint32(prevByte>>(8-lc.numPrevBits))]
 }

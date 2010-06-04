@@ -6,7 +6,7 @@ package lzma
 
 type rangeBitTreeCoder struct {
 	models       []uint16 // length(models) is at most 1<<8
-	numBitLevels uint32   // max 8 (between 2 and 8); sould it be a uint8 ?
+	numBitLevels uint32   // min 2; max 8
 }
 
 func newRangeBitTreeCoder(numBitLevels uint32) *rangeBitTreeCoder {
@@ -33,7 +33,7 @@ func (rc *rangeBitTreeCoder) reverseDecode(rd *rangeDecoder) (res uint32) {
 		bit := rd.decodeBit(rc.models, index)
 		index <<= 1
 		index += bit
-		res = res | (bit << bitIndex)
+		res |= bit << bitIndex
 	}
 	return
 }
@@ -45,7 +45,7 @@ func reverseDecodeIndex(rd *rangeDecoder, models []uint16, startIndex, numBitMod
 		bit := rd.decodeBit(models, startIndex+index)
 		index <<= 1
 		index += bit
-		res = res | (bit << bitIndex)
+		res |= bit << bitIndex
 	}
 	return
 }

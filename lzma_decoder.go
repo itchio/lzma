@@ -115,9 +115,7 @@ func getLenToPosState(length uint32) uint32 {
 // Offset Size 	      Description
 //   0     1   		Special LZMA properties (lc,lp, pb in encoded form)
 //   1     4   		Dictionary size (little endian)
-//   5     8   		Uncompressed size (little endian). Size -1 means unknown size
-//  13     5		range coder's code field
-// end-6   6		End Marker Bytes, only if size == -1
+//   5     8   		Uncompressed size (little endian). Size -1 stands for unknown size
 
 
 // lzma properties
@@ -183,12 +181,12 @@ func (z *decoder) doDecode() {
 		posState := uint32(nowPos) & z.posStateMask
 		res := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState)
 		if res == 0 {
-			lc2 := z.litCoder.getCoder(uint32(nowPos), prevByte)
+			lsc := z.litCoder.getSubCoder(uint32(nowPos), prevByte)
 			if !stateIsCharState(state) {
-				res := lc2.decodeWithMatchByte(z.rd, z.outWin.getByte(rep0))
+				res := lsc.decodeWithMatchByte(z.rd, z.outWin.getByte(rep0))
 				prevByte = res
 			} else {
-				res := lc2.decodeNormal(z.rd)
+				res := lsc.decodeNormal(z.rd)
 				prevByte = res
 			}
 			z.outWin.putByte(prevByte)
