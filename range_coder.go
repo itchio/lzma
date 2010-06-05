@@ -60,14 +60,14 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32) {
 		rd.rrange >>= 1
 		t := (rd.code - rd.rrange) >> 31
 		rd.code -= rd.rrange & (t - 1)
-		res = (res << 1) | (1 - t)
+		res = res<<1 | (1 - t)
 		if rd.rrange < kTopValue {
 			c, err := rd.r.ReadByte() // ERR - panic
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | uint32(c)
-			rd.rrange = rd.rrange << 8
+			rd.code = rd.code<<8 | uint32(c)
+			rd.rrange <<= 8
 		}
 	}
 	return
@@ -84,8 +84,8 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | uint32(b)
-			rd.rrange = rd.rrange << 8
+			rd.code = rd.code<<8 | uint32(b)
+			rd.rrange <<= 8
 		}
 		res = 0
 	} else {
@@ -97,7 +97,7 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			rd.code = (rd.code << 8) | uint32(b)
+			rd.code = rd.code<<8 | uint32(b)
 			rd.rrange <<= 8
 		}
 		res = 1
@@ -109,7 +109,7 @@ func initBitModels(length uint32) (probs []uint16) {
 	probs = make([]uint16, length)
 	val := uint16(kBitModelTotal) >> 1
 	for i := uint32(0); i < length; i++ {
-		probs[i] = val
+		probs[i] = val // 1 << 10
 	}
 	return
 }
@@ -168,7 +168,7 @@ func (re *rangeEncoder) flush() {
 
 func (re *rangeEncoder) shiftLow() {
 	lowHi := uint32(re.low >> 32)
-	if lowHi != 0 || re.low < uint64(0xFF000000) {
+	if lowHi != 0 || re.low < uint64(0x00000000FF000000) {
 		re.pos += uint64(re.cacheSize)
 		temp := re.cache
 		dwtemp := uint32(1) // execute the loop at least once (do-while)
@@ -177,7 +177,7 @@ func (re *rangeEncoder) shiftLow() {
 			if err != nil {
 				error(err) // panic, will recover from it in the upper-most level
 			}
-			temp = 0xFF
+			temp = 0x000000FF
 			re.cacheSize--
 		}
 		re.cache = uint32(re.low) >> 24
@@ -210,7 +210,7 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) {
 		re.rrange = newBound
 		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
 	} else {
-		re.low += uint64(newBound) & uint64(0xFFFFFFFF)
+		re.low += uint64(newBound) & uint64(0xFFFFFFFFFFFFFFFF)
 		re.rrange -= newBound
 		probs[index] = prob - prob>>kNumMoveBits
 	}

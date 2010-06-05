@@ -120,8 +120,10 @@ func getLenToPosState(length uint32) uint32 {
 
 // lzma properties
 type props struct {
-	lc, lp, pb uint8
-	dictSize   uint32
+	litContextBits, // lc
+	litPosStateBits, // lp
+	posStateBits     uint8 // pb
+	dictSize uint32
 }
 
 func (p *props) decodeProps(buf []byte) {
@@ -129,11 +131,11 @@ func (p *props) decodeProps(buf []byte) {
 	if d > (9 * 5 * 5) {
 		error(headerError) // panic, will recover later
 	}
-	p.lc = d % 9
+	p.litContextBits = d % 9
 	d /= 9
-	p.pb = d / 5
-	p.lp = d % 5
-	if p.lc > kNumLitContextBitsMax || p.lp > 4 || p.pb > kNumPosStatesBitsMax {
+	p.posStateBits = d / 5
+	p.litPosStateBits = d % 5
+	if p.litContextBits > kNumLitContextBitsMax || p.litPosStateBits > 4 || p.posStateBits > kNumPosStatesBitsMax {
 		error(headerError) // panic, will recover later
 	}
 	for i := 0; i < 4; i++ {
@@ -179,73 +181,63 @@ func (z *decoder) doDecode() {
 
 	for z.unpackSize < 0 || int64(nowPos) < z.unpackSize {
 		posState := uint32(nowPos) & z.posStateMask
-		res := z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState)
-		if res == 0 {
+		if z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState) == 0 {
 			lsc := z.litCoder.getSubCoder(uint32(nowPos), prevByte)
 			if !stateIsCharState(state) {
-				res := lsc.decodeWithMatchByte(z.rd, z.outWin.getByte(rep0))
-				prevByte = res
+				prevByte = lsc.decodeWithMatchByte(z.rd, z.outWin.getByte(rep0))
 			} else {
-				res := lsc.decodeNormal(z.rd)
-				prevByte = res
+				prevByte = lsc.decodeNormal(z.rd)
 			}
 			z.outWin.putByte(prevByte)
 			state = stateUpdateChar(state)
 			nowPos++
 		} else {
 			var length uint32
-			res := z.rd.decodeBit(z.repDecoders, state)
-			if res == 1 {
+			if z.rd.decodeBit(z.repDecoders, state) == 1 {
 				length = 0
-				res := z.rd.decodeBit(z.repG0Decoders, state)
-				if res == 0 {
-					res := z.rd.decodeBit(z.rep0LongDecoders, state<<kNumPosStatesBitsMax+posState)
-					if res == 0 {
+				if z.rd.decodeBit(z.repG0Decoders, state) == 0 {
+					if z.rd.decodeBit(z.rep0LongDecoders, state<<kNumPosStatesBitsMax+posState) == 0 {
 						state = stateUpdateShortRep(state)
 						length = 1
 					}
 				} else {
 					var distance uint32
-					res := z.rd.decodeBit(z.repG1Decoders, state)
-					if res == 0 {
+					if z.rd.decodeBit(z.repG1Decoders, state) == 0 {
 						distance = rep1
 					} else {
-						res := z.rd.decodeBit(z.repG2Decoders, state)
-						if res == 0 {
+						if z.rd.decodeBit(z.repG2Decoders, state) == 0 {
 							distance = rep2
 						} else {
-							distance = rep3
-							rep3 = rep2
+							//distance = rep3
+							//rep3 = rep2
+							distance, rep3 = rep3, rep2
 						}
 						rep2 = rep1
 					}
-					rep1 = rep0
-					rep0 = distance
+					//rep1 = rep0
+					//rep0 = distance
+					rep1, rep0 = rep0, distance
 				}
 				if length == 0 {
-					res := z.repLenCoder.decode(z.rd, posState)
-					length = res + kMatchMinLen
+					length = z.repLenCoder.decode(z.rd, posState) + kMatchMinLen
 					state = stateUpdateRep(state)
 				}
 			} else {
-				rep3 = rep2
-				rep2 = rep1
-				rep1 = rep0
-				res := z.lenCoder.decode(z.rd, posState)
-				length = res + kMatchMinLen
+				//rep3 = rep2
+				//rep2 = rep1
+				//rep1 = rep0
+				rep3, rep2, rep1 = rep2, rep1, rep0
+				length = z.lenCoder.decode(z.rd, posState) + kMatchMinLen
 				state = stateUpdateMatch(state)
 				posSlot := z.posSlotCoders[getLenToPosState(length)].decode(z.rd)
 				if posSlot >= kStartPosModelIndex {
 					numDirectBits := posSlot>>1 - 1
 					rep0 = (2 | posSlot&1) << numDirectBits
 					if posSlot < kEndPosModelIndex {
-						res := reverseDecodeIndex(z.rd, z.posDecoders, rep0-posSlot-1, numDirectBits)
-						rep0 += res
+						rep0 += reverseDecodeIndex(z.rd, z.posDecoders, rep0-posSlot-1, numDirectBits)
 					} else {
-						res := z.rd.decodeDirectBits(numDirectBits - kNumAlignBits)
-						rep0 += res << kNumAlignBits
-						res = z.posAlignCoder.reverseDecode(z.rd)
-						rep0 += res
+						rep0 += z.rd.decodeDirectBits(numDirectBits-kNumAlignBits) << kNumAlignBits
+						rep0 += z.posAlignCoder.reverseDecode(z.rd)
 						if int32(rep0) < 0 {
 							if rep0 == 0xFFFFFFFF {
 								break
@@ -293,12 +285,12 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.rd = newRangeDecoder(r)
 
 	z.dictSizeCheck = maxUInt32(z.prop.dictSize, 1)
-	z.outWin = newLzOutWindow(w, maxUInt32(z.dictSizeCheck, 1<<12))
+	z.outWin = newLzOutWindow(w, maxUInt32(z.dictSizeCheck, 1<<12)) // ? is 1<<12 the minimum window size because in java the dict size was at least 1<<12 ?
 
-	z.litCoder = newLitCoder(uint32(z.prop.lp), uint32(z.prop.lc))
-	z.lenCoder = newLenCoder(uint32(1 << z.prop.pb))
-	z.repLenCoder = newLenCoder(uint32(1 << z.prop.pb))
-	z.posStateMask = uint32(1<<z.prop.pb - 1)
+	z.litCoder = newLitCoder(uint32(z.prop.litPosStateBits), uint32(z.prop.litContextBits))
+	z.lenCoder = newLenCoder(uint32(1 << z.prop.posStateBits))
+	z.repLenCoder = newLenCoder(uint32(1 << z.prop.posStateBits))
+	z.posStateMask = uint32(1<<z.prop.posStateBits - 1)
 	z.matchDecoders = initBitModels(kNumStates << kNumPosStatesBitsMax)
 	z.repDecoders = initBitModels(kNumStates)
 	z.repG0Decoders = initBitModels(kNumStates)
@@ -315,6 +307,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.doDecode()
 	return
 }
+
 
 // NewDecoder returns a new ReadCloser that can be used to read the uncompressed
 // version of r. It is the caller's responsibility to call Close on the ReadCloser

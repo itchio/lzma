@@ -11,7 +11,7 @@ type lenCoder struct {
 	highCoder *rangeBitTreeCoder
 }
 
-func newLenCoder(numPosStates uint32) *lenCoder {
+func newLenCoder(numPosStates /*1 << pb*/ uint32) *lenCoder {
 	lc := &lenCoder{
 		choice:    initBitModels(2),
 		lowCoder:  make([]*rangeBitTreeCoder, kNumPosStatesMax),

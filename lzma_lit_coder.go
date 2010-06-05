@@ -104,9 +104,9 @@ func (lsc *litSubCoder) getPrice(matchMode bool, matchByte, symbol byte) uint32 
 
 type litCoder struct {
 	coders      []*litSubCoder
-	numPrevBits uint32
-	numPosBits  uint32
-	posMask     uint32
+	numPrevBits uint32 // literal context bits // lc
+	// numPosBits  uint32 // literal position state bits // lp
+	posMask uint32
 }
 
 func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
@@ -114,8 +114,8 @@ func newLitCoder(numPosBits, numPrevBits uint32) *litCoder {
 	lc := &litCoder{
 		coders:      make([]*litSubCoder, numStates),
 		numPrevBits: numPrevBits,
-		numPosBits:  numPosBits,
-		posMask:     (1 << numPosBits) - 1,
+		// numPosBits:  numPosBits,
+		posMask: (1 << numPosBits) - 1,
 	}
 	for i := uint32(0); i < numStates; i++ {
 		lc.coders[i] = newLitSubCoder()

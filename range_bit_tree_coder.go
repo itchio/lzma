@@ -56,7 +56,7 @@ func (rc *rangeBitTreeCoder) encode(re *rangeEncoder, symbol uint32) {
 		bitIndex--
 		bit := (symbol >> bitIndex) & 1
 		re.encode(rc.models, m, bit)
-		m = (m << 1) | bit
+		m = m<<1 | bit
 	}
 }
 
@@ -65,7 +65,7 @@ func (rc *rangeBitTreeCoder) reverseEncode(re *rangeEncoder, symbol uint32) {
 	for i := uint32(0); i < rc.numBitLevels; i++ {
 		bit := symbol & 1
 		re.encode(rc.models, m, bit)
-		m = (m << 1) | bit
+		m = m<<1 | bit
 		symbol >>= 1
 	}
 }
@@ -77,7 +77,7 @@ func (rc *rangeBitTreeCoder) getPrice(symbol uint32) (res uint32) {
 		bitIndex--
 		bit := (symbol >> bitIndex) & 1
 		res += getPrice(rc.models[m], bit)
-		m = (m << 1) + bit
+		m = m<<1 + bit
 	}
 	return
 }
@@ -89,7 +89,7 @@ func (rc *rangeBitTreeCoder) reverseGetPrice(symbol uint32) (res uint32) {
 		bit := symbol & 1
 		symbol >>= 1
 		res += getPrice(rc.models[m], bit)
-		m = (m << 1) | bit
+		m = m<<1 | bit
 	}
 	return
 }
@@ -101,7 +101,7 @@ func reverseGetPriceIndex(models []uint16, startIndex, numBitLevels, symbol uint
 		bit := symbol & 1
 		symbol >>= 1
 		res += getPrice(models[startIndex+m], bit)
-		m = (m << 1) | bit
+		m = m<<1 | bit
 	}
 	return
 }
@@ -111,7 +111,7 @@ func reverseEncodeIndex(re *rangeEncoder, models []uint16, startIndex, numBitLev
 	for i := uint32(0); i < numBitLevels; i++ {
 		bit := symbol & 1
 		re.encode(models, startIndex+m, bit)
-		m = (m << 1) | bit
+		m = m<<1 | bit
 		symbol >>= 1
 	}
 }

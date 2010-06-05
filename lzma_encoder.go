@@ -1043,7 +1043,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 		header[i+1] = byte(z.cl.dictSize >> (8 * i))
 	}
 	for i := uint32(0); i < 8; i++ {
-		header[i+lzmaPropSize] = byte(uint64(z.size>>(8*i)) & 0xFF)
+		header[i+lzmaPropSize] = byte(z.size >> (8 * i))
 	}
 	n, err := w.Write(header) // ERR
 	if err != nil {

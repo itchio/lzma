@@ -71,13 +71,12 @@ func (ow *lzOutWindow) putByte(b byte) {
 	}
 }
 
-func (ow *lzOutWindow) getByte(distance uint32) (b byte) {
+func (ow *lzOutWindow) getByte(distance uint32) byte {
 	pos := ow.pos - distance - 1
 	if pos >= ow.winSize {
 		pos += ow.winSize
 	}
-	b = ow.buf[pos]
-	return
+	return ow.buf[pos]
 }
 
 
