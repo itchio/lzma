@@ -32,12 +32,12 @@ func (ow *lzOutWindow) flush() {
 	if size == 0 {
 		return
 	}
-	n, err := ow.w.Write(ow.buf[ow.streamPos : ow.streamPos+size]) // ERR - panic
+	n, err := ow.w.Write(ow.buf[ow.streamPos : ow.streamPos+size])
 	if err != nil {
-		error(err) // panic, will recover from it in the upper-most level
+		throw(err)
 	}
 	if uint32(n) != size {
-		error(nWriteError) // panic, will recover from it in the upper-most level
+		throw(nWriteError)
 	}
 	if ow.pos >= ow.winSize {
 		ow.pos = 0
@@ -132,9 +132,9 @@ func (iw *lzInWindow) readBlock() {
 		if iw.blockSize-iw.bufOffset-iw.streamPos == 0 {
 			return
 		}
-		n, err := iw.r.Read(iw.buf[iw.bufOffset+iw.streamPos : iw.blockSize]) // ERR - panic
+		n, err := iw.r.Read(iw.buf[iw.bufOffset+iw.streamPos : iw.blockSize])
 		if err != nil && err != os.EOF {
-			error(err) // panic, will recover from it in upper-most level
+			throw(err)
 		}
 		if n == 0 && err == os.EOF {
 			iw.posLimit = iw.streamPos

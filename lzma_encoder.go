@@ -53,7 +53,7 @@ func (e *argumentValueError) String() string {
 
 // Report error and stop executing. Wwraps os.Errors an osError for handlePanics() to
 // distinguish them from genuine panics
-func error(err os.Error) {
+func throw(err os.Error) {
 	panic(&osError{err})
 }
 
@@ -129,22 +129,22 @@ var levels = []compressionLevel{
 
 func (cl *compressionLevel) checkValues() {
 	if cl.dictSize < 12 || cl.dictSize > 29 {
-		error(&argumentValueError{"dictionary size out of range", cl.dictSize})
+		throw(&argumentValueError{"dictionary size out of range", cl.dictSize})
 	}
 	if cl.fastBytes < 5 || cl.fastBytes > 273 {
-		error(&argumentValueError{"number of fast bytes out of range", cl.fastBytes})
+		throw(&argumentValueError{"number of fast bytes out of range", cl.fastBytes})
 	}
 	if cl.litContextBits < 0 || cl.litContextBits > 8 {
-		error(&argumentValueError{"number of literal context bits out of range", cl.litContextBits})
+		throw(&argumentValueError{"number of literal context bits out of range", cl.litContextBits})
 	}
 	if cl.litPosStateBits < 0 || cl.litPosStateBits > 4 {
-		error(&argumentValueError{"number of literal position bits out of range", cl.litPosStateBits})
+		throw(&argumentValueError{"number of literal position bits out of range", cl.litPosStateBits})
 	}
 	if cl.posStateBits < 0 || cl.posStateBits > 4 {
-		error(&argumentValueError{"number of position bits out of range", cl.posStateBits})
+		throw(&argumentValueError{"number of position bits out of range", cl.posStateBits})
 	}
 	if cl.matchFinder != "bt2" && cl.matchFinder != "bt4" {
-		error(&argumentValueError{"unsuported match finder", cl.matchFinder})
+		throw(&argumentValueError{"unsuported match finder", cl.matchFinder})
 	}
 }
 
@@ -1045,7 +1045,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	for i := uint32(0); i < 8; i++ {
 		header[i+lzmaPropSize] = byte(z.size >> (8 * i))
 	}
-	n, err := w.Write(header) // ERR
+	n, err := w.Write(header)
 	if err != nil {
 		return
 	}

@@ -129,14 +129,14 @@ type props struct {
 func (p *props) decodeProps(buf []byte) {
 	d := buf[0]
 	if d > (9 * 5 * 5) {
-		error(headerError) // panic, will recover later
+		throw(headerError)
 	}
 	p.litContextBits = d % 9
 	d /= 9
 	p.posStateBits = d / 5
 	p.litPosStateBits = d % 5
 	if p.litContextBits > kNumLitContextBitsMax || p.litPosStateBits > 4 || p.posStateBits > kNumPosStatesBitsMax {
-		error(headerError) // panic, will recover later
+		throw(headerError)
 	}
 	for i := 0; i < 4; i++ {
 		p.dictSize += uint32(buf[i+1]) << uint32(i*8)
@@ -242,7 +242,7 @@ func (z *decoder) doDecode() {
 							if rep0 == 0xFFFFFFFF {
 								break
 							}
-							error(streamError) // panic, will recover later
+							throw(streamError)
 						}
 					}
 				} else {
@@ -250,7 +250,7 @@ func (z *decoder) doDecode() {
 				}
 			}
 			if uint64(rep0) >= nowPos || rep0 >= z.dictSizeCheck {
-				error(streamError) // panic, will recover later
+				throw(streamError)
 			}
 			z.outWin.copyBlock(rep0, length)
 			nowPos += uint64(length)
@@ -265,7 +265,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 
 	// read 13 bytes (lzma header)
 	header := make([]byte, lzmaHeaderSize)
-	n, err := r.Read(header) // ERR
+	n, err := r.Read(header)
 	if err != nil {
 		return
 	}

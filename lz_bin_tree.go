@@ -34,7 +34,7 @@ type lzBinTree struct {
 
 func newLzBinTree(r io.Reader, historySize, keepAddBufBefore, matchMaxLen, keepAddBufAfter, numHashBytes uint32) *lzBinTree {
 	bt := &lzBinTree{
-		son:           make([]uint32, (historySize+1)*2),
+		son:           make([]uint32, (historySize+1)*2), // history size is the dictSize from the encoder
 		cyclicBufPos:  0,
 		cyclicBufSize: historySize + 1,
 		matchMaxLen:   matchMaxLen,

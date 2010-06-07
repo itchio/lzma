@@ -42,12 +42,12 @@ func newRangeDecoder(r io.Reader) *rangeDecoder {
 	rd.rrange = 0xFFFFFFFF
 	rd.code = 0
 	buf := make([]byte, 5)
-	n, err := rd.r.Read(buf) // ERR - panic
+	n, err := rd.r.Read(buf)
 	if err != nil {
-		error(err) // panic, will recover from it in the upper-most level
+		throw(err)
 	}
 	if n != len(buf) {
-		error(nReadError) // panic, will recover from it in the upper-most level
+		throw(nReadError)
 	}
 	for i := 0; i < len(buf); i++ {
 		rd.code = rd.code<<8 | uint32(buf[i])
@@ -62,9 +62,9 @@ func (rd *rangeDecoder) decodeDirectBits(numTotalBits uint32) (res uint32) {
 		rd.code -= rd.rrange & (t - 1)
 		res = res<<1 | (1 - t)
 		if rd.rrange < kTopValue {
-			c, err := rd.r.ReadByte() // ERR - panic
+			c, err := rd.r.ReadByte()
 			if err != nil {
-				error(err) // panic, will recover from it in the upper-most level
+				throw(err)
 			}
 			rd.code = rd.code<<8 | uint32(c)
 			rd.rrange <<= 8
@@ -80,9 +80,9 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 		rd.rrange = newBound
 		probs[index] = prob + (kBitModelTotal-prob)>>kNumMoveBits
 		if rd.rrange < kTopValue {
-			b, err := rd.r.ReadByte() // ERR - panic
+			b, err := rd.r.ReadByte()
 			if err != nil {
-				error(err) // panic, will recover from it in the upper-most level
+				throw(err)
 			}
 			rd.code = rd.code<<8 | uint32(b)
 			rd.rrange <<= 8
@@ -93,9 +93,9 @@ func (rd *rangeDecoder) decodeBit(probs []uint16, index uint32) (res uint32) {
 		rd.code -= newBound
 		probs[index] = prob - prob>>kNumMoveBits
 		if rd.rrange < kTopValue {
-			b, err := rd.r.ReadByte() // ERR - panic
+			b, err := rd.r.ReadByte()
 			if err != nil {
-				error(err) // panic, will recover from it in the upper-most level
+				throw(err)
 			}
 			rd.code = rd.code<<8 | uint32(b)
 			rd.rrange <<= 8
@@ -160,9 +160,9 @@ func (re *rangeEncoder) flush() {
 	for i := 0; i < 5; i++ {
 		re.shiftLow()
 	}
-	err := re.w.Flush() // ERR - panic
+	err := re.w.Flush()
 	if err != nil {
-		error(err) // panic, will recover from it in the upper-most level
+		throw(err)
 	}
 }
 
@@ -173,9 +173,9 @@ func (re *rangeEncoder) shiftLow() {
 		temp := re.cache
 		dwtemp := uint32(1) // execute the loop at least once (do-while)
 		for ; dwtemp != 0; dwtemp = re.cacheSize {
-			err := re.w.WriteByte(byte(temp + lowHi)) // ERR - panic
+			err := re.w.WriteByte(byte(temp + lowHi))
 			if err != nil {
-				error(err) // panic, will recover from it in the upper-most level
+				throw(err)
 			}
 			temp = 0x000000FF
 			re.cacheSize--
