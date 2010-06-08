@@ -180,7 +180,7 @@ func main() {
 
 		// write into outFile from z
 		defer pr.Close()
-		z := lzma.NewDecoder(pr)
+		z := lzma.NewReader(pr)
 		defer z.Close()
 		var outFile *os.File
 		var err os.Error
@@ -209,7 +209,7 @@ func main() {
 			if stdin == true {
 				inFile = os.Stdin
 				defer inFile.Close()
-				z = lzma.NewEncoderLevel(pw, *level)
+				z = lzma.NewWriterLevel(pw, *level)
 				defer z.Close()
 			} else {
 				inFile, err = os.Open(inFilePath, os.O_RDONLY, 0400)
@@ -221,7 +221,7 @@ func main() {
 				if err != nil {
 					log.Exit(err.String())
 				}
-				z = lzma.NewEncoderSizeLevel(pw, int64(f.Size), *level)
+				z = lzma.NewWriterSizeLevel(pw, int64(f.Size), *level)
 				defer z.Close()
 			}
 

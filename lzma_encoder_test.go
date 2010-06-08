@@ -17,12 +17,12 @@ func pipe(t *testing.T, efunc func(io.WriteCloser), dfunc func(io.ReadCloser), s
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close()
-		ze := NewEncoderSizeLevel(pw, size, level)
+		ze := NewWriterSizeLevel(pw, size, level)
 		defer ze.Close()
 		efunc(ze)
 	}()
 	defer pr.Close()
-	zd := NewDecoder(pr)
+	zd := NewReader(pr)
 	defer zd.Close()
 	dfunc(zd)
 }
@@ -103,7 +103,7 @@ func TestEncoder(t *testing.T) {
 			}
 			go func() {
 				defer pw.Close()
-				w := NewEncoderSizeLevel(pw, size, tt.level)
+				w := NewWriterSizeLevel(pw, size, tt.level)
 				defer w.Close()
 				_, err := io.Copy(w, in)
 				if err != nil {
@@ -128,12 +128,12 @@ func BenchmarkEncoder(b *testing.B) {
 	buf := new(bytes.Buffer)
 	start := make(chan bool)
 	for i := 0; i < b.N; i++ {
-		in := bytes.NewBuffer(bk.raw)
+		in := bytes.NewBuffer(bench.raw)
 		pr, pw := io.Pipe()
 		defer pr.Close()
 		go func() {
 			defer pw.Close()
-			w := NewEncoderLevel(pw, bk.level)
+			w := NewWriterLevel(pw, bench.level)
 			defer w.Close()
 			start <- true
 			n, err := io.Copy(w, in)
@@ -151,7 +151,7 @@ func BenchmarkEncoder(b *testing.B) {
 			log.Exitf("%v", err)
 		}
 	}
-	if bytes.Equal(buf.Bytes(), bk.lzma) == false { // check only once, not at every iteration
-		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bk.descr, len(buf.Bytes()), buf.String(), len(bk.lzma), string(bk.lzma))
+	if bytes.Equal(buf.Bytes(), bench.lzma) == false { // check only once, not at every iteration
+		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bench.descr, len(buf.Bytes()), buf.String(), len(bench.lzma), string(bench.lzma))
 	}
 }

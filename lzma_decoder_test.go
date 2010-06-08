@@ -15,7 +15,7 @@ func TestDecoder(t *testing.T) {
 	b := new(bytes.Buffer)
 	for _, tt := range lzmaTests {
 		in := bytes.NewBuffer(tt.lzma)
-		r := NewDecoder(in)
+		r := NewReader(in)
 		defer r.Close()
 		b.Reset()
 		n, err := io.Copy(b, r)
@@ -36,11 +36,11 @@ func BenchmarkDecoder(b *testing.B) {
 	buf := new(bytes.Buffer)
 	for i := 0; i < b.N; i++ {
 		buf.Reset()
-		in := bytes.NewBuffer(bk.lzma)
+		in := bytes.NewBuffer(bench.lzma)
 		b.StartTimer()
 		// timer starts before this contructor because variable "in" already
 		// contains data, so the decoding start rigth away
-		r := NewDecoder(in)
+		r := NewReader(in)
 		n, err := io.Copy(buf, r)
 		b.StopTimer()
 		if err != nil {
@@ -49,7 +49,7 @@ func BenchmarkDecoder(b *testing.B) {
 		b.SetBytes(n)
 		r.Close()
 	}
-	if bytes.Equal(buf.Bytes(), bk.raw) == false { // check only after last iteration
-		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bk.descr, len(buf.Bytes()), buf.String(), len(bk.raw), bk.raw)
+	if bytes.Equal(buf.Bytes(), bench.raw) == false { // check only after last iteration
+		log.Exitf("%s: got %d-byte %q, want %d-byte %q", bench.descr, len(buf.Bytes()), buf.String(), len(bench.raw), bench.raw)
 	}
 }

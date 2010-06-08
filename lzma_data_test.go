@@ -305,7 +305,7 @@ func readFile(filename string) []byte {
 	return file
 }
 
-var bk = lzmaBenchmark{
+var bench = lzmaBenchmark{
 	descr: "text bench with size == -1",
 	level: 3,
 	raw:   readFile("data/data.txt"),

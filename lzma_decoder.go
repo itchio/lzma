@@ -309,10 +309,10 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 }
 
 
-// NewDecoder returns a new ReadCloser that can be used to read the uncompressed
+// NewReader returns a new ReadCloser that can be used to read the uncompressed
 // version of r. It is the caller's responsibility to call Close on the ReadCloser
 // when finished reading.
-func NewDecoder(r io.Reader) io.ReadCloser {
+func NewReader(r io.Reader) io.ReadCloser {
 	var z decoder
 	pr, pw := io.Pipe()
 	go func() {

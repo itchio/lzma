@@ -51,8 +51,8 @@ func (e *argumentValueError) String() string {
 }
 
 
-// Report error and stop executing. Wwraps os.Errors an osError for handlePanics() to
-// distinguish them from genuine panics
+// Report error and stop executing. Wraps os.Errors an osError for handlePanics() to
+// distinguish them from genuine panics.
 func throw(err os.Error) {
 	panic(&osError{err})
 }
@@ -106,7 +106,7 @@ type compressionLevel struct {
 	dictSize        uint32 // d, 1 << dictSize
 	fastBytes       uint32 // fb
 	litContextBits  uint32 // lc
-	litPosStateBits uint32 // lp
+	litPosStateBits uint32 // lp // not used
 	posStateBits    uint32 // pb
 	matchFinder     string // mf
 	//compressionMode uint32 // a
@@ -1129,7 +1129,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 	return
 }
 
-// NewEncoderSizeLevel writes to the given Writer the compressed version of
+// NewWriterSizeLevel writes to the given Writer the compressed version of
 // data written to the returned WriteCloser. It is the caller's responsibility
 // to call Close on the WriteCloser when done. size is the actual size of
 // uncompressed data that's going to be written to WriteCloser. If size is
@@ -1140,7 +1140,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // If size is -1, last bytes are encoded in a different way to mark the end of
 // the stream. The size of the compressed data will increase by 5 or 6 bytes.
 //
-func NewEncoderSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
+func NewWriterSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
 	// the reason for which size is an argument is that lzma, unlike gzip,
 	// stores the size before any compressed data. gzip appends the size and
 	// the checksum at the end of the stream, thus it can compute the size
@@ -1154,20 +1154,20 @@ func NewEncoderSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
 	return pw
 }
 
-// Same as NewEncoderSizeLevel(w, -1, level).
+// Same as NewWriterSizeLevel(w, -1, level).
 //
-func NewEncoderLevel(w io.Writer, level int) io.WriteCloser {
-	return NewEncoderSizeLevel(w, -1, level)
+func NewWriterLevel(w io.Writer, level int) io.WriteCloser {
+	return NewWriterSizeLevel(w, -1, level)
 }
 
-// Same as NewEncoderSizeLevel(w, size, DefaultCompression).
+// Same as NewWriterSizeLevel(w, size, DefaultCompression).
 //
-func NewEncoderSize(w io.Writer, size int64) io.WriteCloser {
-	return NewEncoderSizeLevel(w, size, DefaultCompression)
+func NewWriterSize(w io.Writer, size int64) io.WriteCloser {
+	return NewWriterSizeLevel(w, size, DefaultCompression)
 }
 
-// Same as NewEncoderSizeLevel(w, -1, DefaultCompression).
+// Same as NewWriterSizeLevel(w, -1, DefaultCompression).
 //
-func NewEncoder(w io.Writer) io.WriteCloser {
-	return NewEncoderSizeLevel(w, -1, DefaultCompression)
+func NewWriter(w io.Writer) io.WriteCloser {
+	return NewWriterSizeLevel(w, -1, DefaultCompression)
 }
