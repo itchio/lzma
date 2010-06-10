@@ -63,6 +63,21 @@ var nReadError os.Error = os.NewError("number of bytes returned by Reader.Read()
 var nWriteError os.Error = os.NewError("number of bytes returned by Writer.Write() didn't meet expectances")
 
 
+// TODO: implement this err
+// A dataIntegrityError reports an error encountered while cheching data integrity.
+// -- from lzma.txt:
+// You can use multiple checks to test data integrity after full decompression:
+// 1) Check Result and "status" variable.
+// 2) Check that output(destLen) = uncompressedSize, if you know real uncompressedSize.
+// 3) Check that output(srcLen) = compressedSize, if you know real compressedSize.
+//     You must use correct finish mode in that case.
+//
+//type dataIntegrityError struct {
+//	msg string
+//	// hz
+//}
+
+
 func stateUpdateChar(index uint32) uint32 {
 	if index < 4 {
 		return 0
@@ -258,6 +273,11 @@ func (z *decoder) doDecode() {
 		}
 	}
 	z.outWin.flush()
+	//if z.unpackSize != -1 {
+	//	if z.outWin.unpacked != z.unpackSize {
+	//		throw(&dataIntegrityError{})
+	//	}
+	//}
 }
 
 func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
@@ -312,6 +332,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 // NewReader returns a new ReadCloser that can be used to read the uncompressed
 // version of r. It is the caller's responsibility to call Close on the ReadCloser
 // when finished reading.
+//
 func NewReader(r io.Reader) io.ReadCloser {
 	var z decoder
 	pr, pw := io.Pipe()

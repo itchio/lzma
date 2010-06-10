@@ -26,20 +26,6 @@ type osError struct {
 }
 
 
-// TODO: implement this err
-// A dataIntegrityError reports an error encountered while cheching data integrity.
-// -- from lzma.txt:
-// You can use multiple checks to test data integrity after full decompression:
-// 1) Check Result and "status" variable.
-// 2) Check that output(destLen) = uncompressedSize, if you know real uncompressedSize.
-// 3) Check that output(srcLen) = compressedSize, if you know real compressedSize.
-//     You must use correct finish mode in that case.
-//
-//type dataIntegrityError struct {
-//	// hz
-//}
-
-
 // An argumentValueError reports an error encountered while parsing user provided arguments.
 type argumentValueError struct {
 	msg string

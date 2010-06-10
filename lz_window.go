@@ -15,6 +15,7 @@ type lzOutWindow struct {
 	winSize   uint32
 	pos       uint32
 	streamPos uint32
+	//unpacked  uint32 // counter of unpacked bytes
 }
 
 func newLzOutWindow(w io.Writer, windowSize uint32) *lzOutWindow {
@@ -24,6 +25,7 @@ func newLzOutWindow(w io.Writer, windowSize uint32) *lzOutWindow {
 		winSize:   windowSize,
 		pos:       0,
 		streamPos: 0,
+		//unpacked:  0,
 	}
 }
 
@@ -39,6 +41,7 @@ func (ow *lzOutWindow) flush() {
 	if uint32(n) != size {
 		throw(nWriteError)
 	}
+	//unpacked += size
 	if ow.pos >= ow.winSize {
 		ow.pos = 0
 	}
