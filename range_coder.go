@@ -39,9 +39,11 @@ func makeReader(r io.Reader) Reader {
 }
 
 func newRangeDecoder(r io.Reader) *rangeDecoder {
-	rd := &rangeDecoder{r: makeReader(r)}
-	rd.rrange = 0xFFFFFFFF
-	rd.code = 0
+	rd := &rangeDecoder{
+		r:      makeReader(r),
+		rrange: 0xFFFFFFFF,
+		code:   0,
+	}
 	buf := make([]byte, 5)
 	n, err := rd.r.Read(buf)
 	if err != nil {
