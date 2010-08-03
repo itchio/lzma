@@ -1041,7 +1041,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 
 	// do not move before w.Write(header)
 	z.re = newRangeEncoder(w)
-	mft, err := strconv.Atoui(strings.Split(z.cl.matchFinder, "", 0)[2])
+	mft, err := strconv.Atoui(strings.Split(z.cl.matchFinder, "", -1)[2])
 	if err != nil {
 		return
 	}
