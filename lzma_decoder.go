@@ -262,14 +262,10 @@ func (z *decoder) doDecode() {
 						if z.rd.decodeBit(z.repG2Decoders, state) == 0 {
 							distance = rep2
 						} else {
-							//distance = rep3
-							//rep3 = rep2
 							distance, rep3 = rep3, rep2
 						}
 						rep2 = rep1
 					}
-					//rep1 = rep0
-					//rep0 = distance
 					rep1, rep0 = rep0, distance
 				}
 				if length == 0 {
@@ -277,9 +273,6 @@ func (z *decoder) doDecode() {
 					state = stateUpdateRep(state)
 				}
 			} else {
-				//rep3 = rep2
-				//rep2 = rep1
-				//rep1 = rep0
 				rep3, rep2, rep1 = rep2, rep1, rep0
 				length = z.lenCoder.decode(z.rd, posState) + kMatchMinLen
 				state = stateUpdateMatch(state)
@@ -344,7 +337,7 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
 	z.rd = newRangeDecoder(r)
 
 	z.dictSizeCheck = maxUInt32(z.prop.dictSize, 1)
-	z.outWin = newLzOutWindow(w, maxUInt32(z.dictSizeCheck, 1<<12)) // ? is 1<<12 the minimum window size because in java the dict size was at least 1<<12 ?
+	z.outWin = newLzOutWindow(w, maxUInt32(z.dictSizeCheck, 1<<12))
 
 	z.litCoder = newLitCoder(uint32(z.prop.litPosStateBits), uint32(z.prop.litContextBits))
 	z.lenCoder = newLenCoder(uint32(1 << z.prop.posStateBits))
