@@ -6,7 +6,7 @@ package main
 
 import (
 	"compress/lzma"
-	//"lzma.googlecode.com/hg/"
+	//"lzma.googlecode.com/hg"
 	"flag"
 	"fmt"
 	"log"
