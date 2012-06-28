@@ -4,10 +4,7 @@
 
 package lzma
 
-import (
-	"io"
-	"os"
-)
+import "io"
 
 type lzOutWindow struct {
 	w         io.Writer
@@ -82,7 +79,6 @@ func (ow *lzOutWindow) getByte(distance uint32) byte {
 	return ow.buf[pos]
 }
 
-
 type lzInWindow struct {
 	r              io.Reader
 	buf            []byte
@@ -136,10 +132,10 @@ func (iw *lzInWindow) readBlock() {
 			return
 		}
 		n, err := iw.r.Read(iw.buf[iw.bufOffset+iw.streamPos : iw.blockSize])
-		if err != nil && err != os.EOF {
+		if err != nil && err != io.EOF {
 			throw(err)
 		}
-		if n == 0 && err == os.EOF {
+		if n == 0 && err == io.EOF {
 			iw.posLimit = iw.streamPos
 			ptr := iw.bufOffset + iw.posLimit
 			if ptr > iw.lastSafePos {

@@ -50,8 +50,8 @@
 package lzma
 
 import (
+	"errors"
 	"io"
-	"os"
 )
 
 const (
@@ -89,16 +89,16 @@ const (
 )
 
 // A streamError reports the presence of corrupt input stream.
-var streamError = os.NewError("error in lzma encoded data stream")
+var streamError = errors.New("error in lzma encoded data stream")
 
 // A headerError reports an error in the header of the lzma encoder file.
-var headerError = os.NewError("error in lzma header")
+var headerError = errors.New("error in lzma header")
 
-// A nReadError reports what it's message reads
-var nReadError = os.NewError("number of bytes returned by Reader.Read() didn't meet expectances")
+// A nReadError reports what its message reads
+var nReadError = errors.New("number of bytes returned by Reader.Read() didn't meet expectances")
 
-// A nWriteError reports what it's message reads
-var nWriteError = os.NewError("number of bytes returned by Writer.Write() didn't meet expectances")
+// A nWriteError reports what its message reads
+var nWriteError = errors.New("number of bytes returned by Writer.Write() didn't meet expectances")
 
 // TODO: implement this err
 // A dataIntegrityError reports an error encountered while cheching data integrity.
@@ -113,7 +113,6 @@ var nWriteError = os.NewError("number of bytes returned by Writer.Write() didn't
 //	msg string
 //	// hz
 //}
-
 
 func stateUpdateChar(index uint32) uint32 {
 	if index < 4 {
@@ -307,7 +306,7 @@ func (z *decoder) doDecode() {
 	//}
 }
 
-func (z *decoder) decoder(r io.Reader, w io.Writer) (err os.Error) {
+func (z *decoder) decoder(r io.Reader, w io.Writer) (err error) {
 	defer handlePanics(&err)
 
 	// read 13 bytes (lzma header)

@@ -7,7 +7,6 @@ package lzma
 import (
 	"bufio"
 	"io"
-	"os"
 )
 
 const (
@@ -22,7 +21,7 @@ const (
 //
 type Reader interface {
 	io.Reader
-	ReadByte() (c byte, err os.Error)
+	ReadByte() (c byte, err error)
 }
 
 type rangeDecoder struct {
@@ -117,7 +116,6 @@ func initBitModels(length uint32) (probs []uint16) {
 	return
 }
 
-
 const (
 	kNumMoveReducingBits  = 2
 	kNumBitPriceShiftBits = 6
@@ -129,8 +127,8 @@ const (
 //
 type Writer interface {
 	io.Writer
-	Flush() os.Error
-	WriteByte(c byte) os.Error
+	Flush() error
+	WriteByte(c byte) error
 }
 
 type rangeEncoder struct {
@@ -223,7 +221,6 @@ func (re *rangeEncoder) encode(probs []uint16, index, symbol uint32) {
 		re.shiftLow()
 	}
 }
-
 
 var probPrices []uint32 = make([]uint32, kBitModelTotal>>kNumMoveReducingBits) // len(probPrices) = 512
 

@@ -5,12 +5,12 @@
 package main
 
 import (
-	"compress/lzma"
-	//"lzma.googlecode.com/hg"
+	//"compress/lzma"
+	"code.google.com/p/lzma"
 	"flag"
 	"fmt"
-	"log"
 	"io"
+	"log"
 	"os"
 	"path"
 	"runtime"
@@ -19,7 +19,7 @@ import (
 
 var (
 	stdout     = flag.Bool("c", false, "write on standard output, keep original files unchanged")
-	decompress = flag.Bool("d", false, "decompress")
+	decompress = flag.Bool("d", false, "decompress; see also -c and -k")
 	force      = flag.Bool("f", false, "force overwrite of output file")
 	help       = flag.Bool("h", false, "print this help message")
 	keep       = flag.Bool("k", false, "keep original files unchaned")
@@ -100,12 +100,12 @@ func main() {
 		inFilePath = flag.Args()[0]
 		f, err := os.Lstat(inFilePath)
 		if err != nil {
-			log.Fatal(err.String())
+			log.Fatal(err.Error())
 		}
 		if f == nil {
 			exit(fmt.Sprintf("file %s not found", inFilePath))
 		}
-		if !f.IsRegular() {
+		if !!f.IsDir() {
 			exit(fmt.Sprintf("%s is not a regular file", inFilePath))
 		}
 
@@ -134,13 +134,13 @@ func main() {
 
 			f, err = os.Lstat(outFilePath)
 			if err != nil && f != nil { // should be: ||| if err != nil && err != "file not found" ||| but i can't find the error's id
-				log.Fatal(err.String())
+				log.Fatal(err.Error())
 			}
-			if f != nil && f.IsRegular() {
+			if f != nil && !f.IsDir() {
 				if *force == true {
 					err = os.Remove(outFilePath)
 					if err != nil {
-						log.Fatal(err.String())
+						log.Fatal(err.Error())
 					}
 				} else {
 					exit(fmt.Sprintf("outFile %s exists. use force to overwrite", outFilePath))
@@ -160,7 +160,7 @@ func main() {
 		go func() {
 			defer pw.Close()
 			var inFile *os.File
-			var err os.Error
+			var err error
 			if stdin == true {
 				inFile = os.Stdin
 			} else {
@@ -168,12 +168,12 @@ func main() {
 			}
 			defer inFile.Close()
 			if err != nil {
-				log.Fatal(err.String())
+				log.Fatal(err.Error())
 			}
 
 			_, err = io.Copy(pw, inFile)
 			if err != nil {
-				log.Fatal(err.String())
+				log.Fatal(err.Error())
 			}
 
 		}()
@@ -183,7 +183,7 @@ func main() {
 		z := lzma.NewReader(pr)
 		defer z.Close()
 		var outFile *os.File
-		var err os.Error
+		var err error
 		if *stdout == true {
 			outFile = os.Stdout
 		} else {
@@ -191,12 +191,12 @@ func main() {
 		}
 		defer outFile.Close()
 		if err != nil {
-			log.Fatal(err.String())
+			log.Fatal(err.Error())
 		}
 
 		_, err = io.Copy(outFile, z)
 		if err != nil {
-			log.Fatal(err.String())
+			log.Fatal(err.Error())
 		}
 
 	} else {
@@ -205,7 +205,7 @@ func main() {
 			defer pw.Close()
 			var z io.WriteCloser
 			var inFile *os.File
-			var err os.Error
+			var err error
 			if stdin == true {
 				inFile = os.Stdin
 				defer inFile.Close()
@@ -215,26 +215,26 @@ func main() {
 				inFile, err = os.Open(inFilePath)
 				defer inFile.Close()
 				if err != nil {
-					log.Fatal(err.String())
+					log.Fatal(err.Error())
 				}
 				f, err := os.Lstat(inFilePath)
 				if err != nil {
-					log.Fatal(err.String())
+					log.Fatal(err.Error())
 				}
-				z = lzma.NewWriterSizeLevel(pw, int64(f.Size), *level)
+				z = lzma.NewWriterSizeLevel(pw, int64(f.Size()), *level)
 				defer z.Close()
 			}
 
 			_, err = io.Copy(z, inFile)
 			if err != nil {
-				log.Fatal(err.String())
+				log.Fatal(err.Error())
 			}
 		}()
 
 		// write into outFile from pr
 		defer pr.Close()
 		var outFile *os.File
-		var err os.Error
+		var err error
 		if *stdout == true {
 			outFile = os.Stdout
 		} else {
@@ -242,19 +242,19 @@ func main() {
 		}
 		defer outFile.Close()
 		if err != nil {
-			log.Fatal(err.String())
+			log.Fatal(err.Error())
 		}
 
 		_, err = io.Copy(outFile, pr)
 		if err != nil {
-			log.Fatal(err.String())
+			log.Fatal(err.Error())
 		}
 	}
 
 	if *stdout == false && *keep == false {
 		err := os.Remove(inFilePath)
 		if err != nil {
-			log.Fatal(err.String())
+			log.Fatal(err.Error())
 		}
 	}
 

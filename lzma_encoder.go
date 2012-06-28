@@ -5,9 +5,8 @@
 package lzma
 
 import (
-	"io"
 	"fmt"
-	"os"
+	"io"
 	"strconv"
 	"strings"
 )
@@ -18,10 +17,10 @@ const (
 	DefaultCompression = 5
 )
 
-// local error wrapper so we can distinguish between os.Errors we want
+// local error wrapper so we can distinguish between error we want
 // to return as errors from genuine panics
 type osError struct {
-	os.Error
+	error
 }
 
 // An argumentValueError reports an error encountered while parsing user provided arguments.
@@ -30,23 +29,23 @@ type argumentValueError struct {
 	val interface{}
 }
 
-func (e *argumentValueError) String() string {
+func (e *argumentValueError) Error() string {
 	return fmt.Sprintf("illegal argument value error: %s with value %v", e.msg, e.val)
 }
 
-// Report error and stop executing. Wraps os.Errors an osError for handlePanics() to
+// Report error and stop executing. Wraps error an osError for handlePanics() to
 // distinguish them from genuine panics.
-func throw(err os.Error) {
+func throw(err error) {
 	panic(&osError{err})
 }
 
 // handlePanics is a deferred function to turn a panic with type *osError into a plain error
 // return. Other panics are unexpected and so are re-enabled.
-func handlePanics(error *os.Error) {
+func handlePanics(error *error) {
 	if v := recover(); v != nil {
 		switch e := v.(type) {
 		case *osError:
-			*error = e.Error
+			*error = e.error
 		default:
 			// runtime errors should crash
 			panic(v)
@@ -59,7 +58,7 @@ type syncPipeReader struct {
 	closeChan chan bool
 }
 
-func (sr *syncPipeReader) CloseWithError(err os.Error) os.Error {
+func (sr *syncPipeReader) CloseWithError(err error) error {
 	retErr := sr.PipeReader.CloseWithError(err)
 	sr.closeChan <- true // finish writer close
 	return retErr
@@ -70,7 +69,7 @@ type syncPipeWriter struct {
 	closeChan chan bool
 }
 
-func (sw *syncPipeWriter) Close() os.Error {
+func (sw *syncPipeWriter) Close() error {
 	err := sw.PipeWriter.Close()
 	<-sw.closeChan // wait for reader close
 	return err
@@ -987,7 +986,7 @@ func (z *encoder) doEncode() {
 	}
 }
 
-func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err os.Error) {
+func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err error) {
 	defer handlePanics(&err)
 
 	// these functions are good candidates for init() but the decoder doesn't need them
@@ -1033,7 +1032,7 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 
 	// do not move before w.Write(header)
 	z.re = newRangeEncoder(w)
-	mft, err := strconv.Atoui(strings.Split(z.cl.matchFinder, "")[2])
+	mft, err := strconv.ParseUint(strings.Split(z.cl.matchFinder, "")[2], 10, 64)
 	if err != nil {
 		return
 	}

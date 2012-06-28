@@ -7,7 +7,6 @@ package lzma
 import (
 	"io/ioutil"
 	"log"
-	"os"
 )
 
 type lzmaTest struct {
@@ -16,7 +15,7 @@ type lzmaTest struct {
 	size  bool
 	raw   string
 	lzma  []byte
-	err   os.Error
+	err   error
 }
 
 var lzmaTests = []lzmaTest{
@@ -288,7 +287,6 @@ var lzmaTests = []lzmaTest{
 		headerError,
 	},
 }
-
 
 type lzmaBenchmark struct {
 	descr string
