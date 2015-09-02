@@ -6,9 +6,9 @@ package main
 
 import (
 	//"compress/lzma"
-	"code.google.com/p/lzma"
 	"flag"
 	"fmt"
+	"github.com/linuxerwang/lzma"
 	"io"
 	"log"
 	"os"
