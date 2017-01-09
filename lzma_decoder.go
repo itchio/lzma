@@ -58,7 +58,7 @@ const (
 	inBufSize           = 1 << 16
 	outBufSize          = 1 << 16
 	lzmaPropSize        = 5
-	lzmaHeaderSize      = lzmaPropSize + 8
+	lzmaLengthSize      = 8
 	lzmaMaxReqInputSize = 20
 
 	kNumRepDistances                = 4
@@ -199,7 +199,7 @@ type decoder struct {
 
 	// lzma header
 	prop       *props
-	unpackSize int64
+	unpackSize uint64
 
 	// hz
 	matchDecoders    []uint16
@@ -227,7 +227,7 @@ func (z *decoder) doDecode() {
 	var nowPos uint64 = 0
 	var prevByte byte = 0
 
-	for z.unpackSize < 0 || int64(nowPos) < z.unpackSize {
+	for nowPos < z.unpackSize {
 		posState := uint32(nowPos) & z.posStateMask
 		if z.rd.decodeBit(z.matchDecoders, state<<kNumPosStatesBitsMax+posState) == 0 {
 			lsc := z.litCoder.getSubCoder(uint32(nowPos), prevByte)
@@ -306,25 +306,33 @@ func (z *decoder) doDecode() {
 	//}
 }
 
-func (z *decoder) decoder(r io.Reader, w io.Writer) (err error) {
+func (z *decoder) decoder(r io.Reader, w io.Writer, uncompressedSize uint64) (err error) {
 	defer handlePanics(&err)
 
-	// read 13 bytes (lzma header)
-	header := make([]byte, lzmaHeaderSize)
+	var headerSize = lzmaPropSize
+	if (uncompressedSize == 0) {
+		headerSize = lzmaPropSize + lzmaLengthSize
+	}
+
+	header := make([]byte, headerSize)
 	n, err := r.Read(header)
 	if err != nil {
 		return
 	}
-	if n != lzmaHeaderSize {
+
+	if n != headerSize {
 		return nReadError
 	}
 	z.prop = &props{}
 	z.prop.decodeProps(header)
 
-	z.unpackSize = 0
-	for i := 0; i < 8; i++ {
-		b := header[lzmaPropSize+i]
-		z.unpackSize = z.unpackSize | int64(b)<<uint64(8*i)
+	z.unpackSize = uncompressedSize
+
+	if (z.unpackSize == 0) {
+		for i := 0; i < 8; i++ {
+			b := header[lzmaPropSize+i]
+			z.unpackSize = z.unpackSize | uint64(b)<<uint64(8*i)
+		}
 	}
 
 	// do not move before r.Read(header)
@@ -358,11 +366,11 @@ func (z *decoder) decoder(r io.Reader, w io.Writer) (err error) {
 // version of r. It is the caller's responsibility to call Close on the ReadCloser
 // when finished reading.
 //
-func NewReader(r io.Reader) io.ReadCloser {
+func NewReader(r io.Reader, uncompressedSize uint64) io.ReadCloser {
 	var z decoder
 	pr, pw := io.Pipe()
 	go func() {
-		err := z.decoder(r, pw)
+		err := z.decoder(r, pw, uncompressedSize)
 		pw.CloseWithError(err)
 	}()
 	return pr
