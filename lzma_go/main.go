@@ -5,16 +5,16 @@
 package main
 
 import (
-	//"compress/lzma"
 	"flag"
 	"fmt"
-	"github.com/linuxerwang/lzma"
 	"io"
 	"log"
 	"os"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/itchio/lzma"
 )
 
 var (
